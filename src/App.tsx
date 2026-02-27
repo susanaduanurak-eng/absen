@@ -239,13 +239,13 @@ export default function App() {
         fetch('/api/admin/journals').then(r => r.json()),
         fetch('/api/admin/permissions').then(r => r.json()),
       ]);
-      setAdminUsers(u);
-      setAdminClasses(c);
-      setAdminSubjects(s);
-      setAdminGeos(g);
-      setAdminAttendance(a);
-      setAdminJournals(j);
-      setAdminPermissions(p);
+      setAdminUsers(Array.isArray(u) ? u : []);
+      setAdminClasses(Array.isArray(c) ? c : []);
+      setAdminSubjects(Array.isArray(s) ? s : []);
+      setAdminGeos(Array.isArray(g) ? g : []);
+      setAdminAttendance(Array.isArray(a) ? a : []);
+      setAdminJournals(Array.isArray(j) ? j : []);
+      setAdminPermissions(Array.isArray(p) ? p : []);
     } catch (err) {
       console.error(err);
     }
@@ -1307,7 +1307,7 @@ export default function App() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-50">
-                    {adminUsers.map(u => (
+                    {Array.isArray(adminUsers) && adminUsers.map(u => (
                       <tr key={u.id} className="hover:bg-zinc-50/50 transition-colors">
                         <td className="px-8 py-5">
                           <p className="font-bold text-zinc-900">{u.name}</p>
@@ -1364,7 +1364,7 @@ export default function App() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-50">
-                    {adminAttendance.map(a => (
+                    {Array.isArray(adminAttendance) && adminAttendance.map(a => (
                       <tr key={a.id} className="hover:bg-zinc-50/50 transition-colors">
                         <td className="px-8 py-5 font-bold text-zinc-900">{a.user_name}</td>
                         <td className="px-8 py-5">
@@ -1387,7 +1387,7 @@ export default function App() {
 
             {adminTab === 'Jurnal' && (
               <div className="grid gap-6">
-                {adminJournals.map(j => (
+                {Array.isArray(adminJournals) && adminJournals.map(j => (
                   <div key={j.id} className="bg-white p-8 rounded-[40px] border border-zinc-100 shadow-sm flex gap-8">
                     <div className="w-32 h-32 bg-zinc-100 rounded-3xl overflow-hidden flex-shrink-0">
                       {j.selfie ? (
@@ -1435,7 +1435,7 @@ export default function App() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-50">
-                    {adminPermissions.map(p => (
+                    {Array.isArray(adminPermissions) && adminPermissions.map(p => (
                       <tr key={p.id} className="hover:bg-zinc-50/50 transition-colors">
                         <td className="px-8 py-5 font-bold text-zinc-900">{p.user_name}</td>
                         <td className="px-8 py-5">
@@ -1477,7 +1477,7 @@ export default function App() {
                     <button type="submit" className="bg-blue-600 text-white px-6 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-blue-200">Tambah</button>
                   </form>
                   <div className="flex flex-wrap gap-2">
-                    {adminClasses.map(c => (
+                    {Array.isArray(adminClasses) && adminClasses.map(c => (
                       <span key={c.id} className="px-4 py-2 bg-zinc-50 border border-zinc-100 rounded-xl text-xs font-bold text-zinc-600">{c.name}</span>
                     ))}
                   </div>
@@ -1498,7 +1498,7 @@ export default function App() {
                     <button type="submit" className="bg-emerald-600 text-white px-6 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-200">Tambah</button>
                   </form>
                   <div className="flex flex-wrap gap-2">
-                    {adminSubjects.map(s => (
+                    {Array.isArray(adminSubjects) && adminSubjects.map(s => (
                       <span key={s.id} className="px-4 py-2 bg-zinc-50 border border-zinc-100 rounded-xl text-xs font-bold text-zinc-600">{s.name}</span>
                     ))}
                   </div>
@@ -1637,15 +1637,15 @@ export default function App() {
 
                     <div className="lg:col-span-2 h-[450px] rounded-[32px] overflow-hidden border border-zinc-100 shadow-inner">
                       <RealtimeMap 
-                        center={adminGeos.length > 0 ? [adminGeos[0].latitude, adminGeos[0].longitude] : [-6.2000, 106.8166]} 
+                        center={adminGeos.length > 0 ? [Number(adminGeos[0].latitude), Number(adminGeos[0].longitude)] : [-6.2000, 106.8166]} 
                         zoom={15}
                         showLiveLabel={false}
                       >
-                        {adminGeos.map(g => (
+                        {Array.isArray(adminGeos) && adminGeos.map(g => (
                           <Circle 
                             key={g.id}
-                            center={[g.latitude, g.longitude]}
-                            radius={g.radius}
+                            center={[Number(g.latitude), Number(g.longitude)]}
+                            radius={Number(g.radius)}
                             pathOptions={{ color: 'blue', fillColor: 'blue', fillOpacity: 0.2 }}
                           >
                             <Popup>
