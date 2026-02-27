@@ -186,6 +186,31 @@ async function startServer() {
     }
   });
 
+  app.put("/api/admin/users/:id", async (req, res) => {
+    const { username, password, name, role, nip } = req.body;
+    const { id } = req.params;
+    try {
+      if (password) {
+        await db.execute("UPDATE users SET username = ?, password = ?, name = ?, role = ?, nip = ? WHERE id = ?", [username, password, name, role, nip, id]);
+      } else {
+        await db.execute("UPDATE users SET username = ?, name = ?, role = ?, nip = ? WHERE id = ?", [username, name, role, nip, id]);
+      }
+      res.json({ success: true });
+    } catch (e: any) {
+      res.status(400).json({ success: false, message: e.message });
+    }
+  });
+
+  app.delete("/api/admin/users/:id", async (req, res) => {
+    const { id } = req.params;
+    try {
+      await db.execute("DELETE FROM users WHERE id = ?", [id]);
+      res.json({ success: true });
+    } catch (e: any) {
+      res.status(400).json({ success: false, message: e.message });
+    }
+  });
+
   app.get("/api/admin/classes", async (req, res) => {
     const [rows] = await db.execute("SELECT * FROM classes");
     res.json(rows);

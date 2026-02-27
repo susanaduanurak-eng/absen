@@ -329,6 +329,7 @@ export default function App() {
 
   // Admin form state
   const [showAddUser, setShowAddUser] = useState(false);
+  const [editingUser, setEditingUser] = useState<any | null>(null);
   const [newUserName, setNewUserName] = useState('');
   const [newUserUsername, setNewUserUsername] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('');
@@ -347,8 +348,11 @@ export default function App() {
     e.preventDefault();
     setLoading(true);
     try {
-      const res = await fetch('/api/admin/users', {
-        method: 'POST',
+      const url = editingUser ? `/api/admin/users/${editingUser.id}` : '/api/admin/users';
+      const method = editingUser ? 'PUT' : 'POST';
+      
+      const res = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: newUserName,
@@ -360,8 +364,9 @@ export default function App() {
       });
       const data = await res.json();
       if (data.success) {
-        setMessage({ text: "User berhasil ditambahkan!", type: 'success' });
+        setMessage({ text: editingUser ? "User berhasil diperbarui!" : "User berhasil ditambahkan!", type: 'success' });
         setShowAddUser(false);
+        setEditingUser(null);
         fetchAdminData();
         // Reset form
         setNewUserName('');
@@ -372,9 +377,22 @@ export default function App() {
         setMessage({ text: data.message, type: 'error' });
       }
     } catch (err) {
-      setMessage({ text: "Gagal menambahkan user", type: 'error' });
+      setMessage({ text: editingUser ? "Gagal memperbarui user" : "Gagal menambahkan user", type: 'error' });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteUser = async (id: number) => {
+    if (!confirm("Apakah Anda yakin ingin menghapus user ini?")) return;
+    try {
+      const res = await fetch(`/api/admin/users/${id}`, { method: 'DELETE' });
+      if ((await res.json()).success) {
+        setMessage({ text: "User berhasil dihapus", type: 'success' });
+        fetchAdminData();
+      }
+    } catch (err) {
+      setMessage({ text: "Gagal menghapus user", type: 'error' });
     }
   };
 
@@ -1283,8 +1301,27 @@ export default function App() {
                             {u.role}
                           </span>
                         </td>
-                        <td className="px-8 py-5">
-                          <button className="text-blue-600 font-bold text-xs hover:underline">Edit</button>
+                        <td className="px-8 py-5 flex gap-3">
+                          <button 
+                            onClick={() => {
+                              setEditingUser(u);
+                              setNewUserName(u.name);
+                              setNewUserUsername(u.username);
+                              setNewUserPassword(''); // Leave blank to keep current
+                              setNewUserRole(u.role);
+                              setNewUserNip(u.nip || '');
+                              setShowAddUser(true);
+                            }}
+                            className="text-blue-600 font-bold text-xs hover:underline"
+                          >
+                            Edit
+                          </button>
+                          <button 
+                            onClick={() => handleDeleteUser(u.id)}
+                            className="text-red-500 font-bold text-xs hover:underline"
+                          >
+                            Hapus
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -1633,8 +1670,18 @@ export default function App() {
               className="relative w-full max-w-lg bg-white rounded-[40px] shadow-2xl p-10 overflow-hidden"
             >
               <div className="flex justify-between items-center mb-8">
-                <h3 className="text-2xl font-black text-zinc-900">Tambah User Baru</h3>
-                <button onClick={() => setShowAddUser(false)} className="p-2 hover:bg-zinc-50 rounded-full">
+                <h3 className="text-2xl font-black text-zinc-900">{editingUser ? 'Edit User' : 'Tambah User Baru'}</h3>
+                <button 
+                  onClick={() => {
+                    setShowAddUser(false);
+                    setEditingUser(null);
+                    setNewUserName('');
+                    setNewUserUsername('');
+                    setNewUserPassword('');
+                    setNewUserNip('');
+                  }} 
+                  className="p-2 hover:bg-zinc-50 rounded-full"
+                >
                   <X className="w-6 h-6 text-zinc-400" />
                 </button>
               </div>
@@ -1680,8 +1727,8 @@ export default function App() {
                     value={newUserPassword}
                     onChange={(e) => setNewUserPassword(e.target.value)}
                     className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl py-4 px-4 font-bold text-zinc-700 outline-none focus:ring-2 focus:ring-blue-500/20"
-                    placeholder="Password minimal 6 karakter"
-                    required
+                    placeholder={editingUser ? "Kosongkan jika tidak ingin ganti" : "Password minimal 6 karakter"}
+                    required={!editingUser}
                   />
                 </div>
                 <div className="space-y-2">
