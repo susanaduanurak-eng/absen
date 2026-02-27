@@ -594,7 +594,7 @@ export default function App() {
             <div className="w-20 h-20 bg-blue-600 rounded-3xl flex items-center justify-center mb-6 shadow-xl shadow-blue-200">
               <ShieldCheck className="text-white w-12 h-12" />
             </div>
-            <h1 className="text-3xl font-bold text-zinc-900 tracking-tight">SMKN 1 Poco Ranaka</h1>
+            <h1 className="text-3xl font-bold text-zinc-900 tracking-tight">ABSENSI & JURNAL SMKN 1 POCO RANAKA</h1>
             <p className="text-zinc-500 text-sm mt-1">Sistem Informasi Kehadiran Terpadu</p>
           </div>
 
@@ -656,7 +656,7 @@ export default function App() {
     <div className="min-h-screen bg-[#F8FAFC] font-sans pb-32">
       {/* Top Header */}
       <header className="bg-white px-8 py-5 flex justify-between items-center sticky top-0 z-30 border-b border-zinc-100">
-        <h1 className="text-xl font-extrabold text-blue-600 tracking-tight">SMKN 1 Poco Ranaka</h1>
+        <h1 className="text-xl font-extrabold text-blue-600 tracking-tight">ABSENSI & JURNAL SMKN 1 POCO RANAKA</h1>
         <div className="flex items-center gap-4">
           <button className="p-2 text-zinc-400 hover:bg-zinc-50 rounded-full transition-colors relative">
             <Bell className="w-6 h-6" />
