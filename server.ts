@@ -1,6 +1,8 @@
 import express from "express";
 import { createServer as createViteServer } from "vite";
 import mysql from "mysql2/promise";
+import { open } from "sqlite";
+import sqlite3 from "sqlite3";
 import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
@@ -37,34 +39,30 @@ async function initDB() {
 
 async function setupSQLite() {
   try {
-    const { default: Database } = await import("better-sqlite3");
-    const sqliteDb = new Database("attendance.db");
+    const sqliteDb = await open({
+      filename: "attendance.db",
+      driver: sqlite3.Database
+    });
     isMySQL = false;
     
     // Wrapper to mimic mysql2/promise for simple queries
     db = {
       execute: async (sql: string, params: any[] = []) => {
-        const stmt = sqliteDb.prepare(sql.replace(/\?/g, (match, offset, string) => {
-          // SQLite uses ? for params too, but we might need to handle named params if we used them
-          return '?';
-        }));
-        
         if (sql.trim().toUpperCase().startsWith("SELECT")) {
-          const rows = stmt.all(...params);
+          const rows = await sqliteDb.all(sql, params);
           return [rows];
         } else {
-          const result = stmt.run(...params);
-          return [{ insertId: result.lastInsertRowid, affectedRows: result.changes }];
+          const result = await sqliteDb.run(sql, params);
+          return [{ insertId: result.lastID, affectedRows: result.changes }];
         }
       },
       query: async (sql: string, params: any[] = []) => {
-        const stmt = sqliteDb.prepare(sql);
-        const rows = stmt.all(...params);
+        const rows = await sqliteDb.all(sql, params);
         return [rows];
       }
     };
 
-    sqliteDb.exec(`
+    await sqliteDb.exec(`
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       username TEXT UNIQUE,
@@ -128,22 +126,23 @@ async function setupSQLite() {
   `);
 
   // Seed default data for SQLite
-  const admin = sqliteDb.prepare("SELECT * FROM users WHERE username = ?").get("admin");
+  const admin = await sqliteDb.get("SELECT * FROM users WHERE username = ?", "admin");
   if (!admin) {
-    sqliteDb.prepare("INSERT INTO users (username, password, name, role) VALUES (?, ?, ?, ?)").run("admin", "admin123", "Administrator", "admin");
+    await sqliteDb.run("INSERT INTO users (username, password, name, role) VALUES (?, ?, ?, ?)", "admin", "admin123", "Administrator", "admin");
   }
-  const guru = sqliteDb.prepare("SELECT * FROM users WHERE username = ?").get("guru");
+  const guru = await sqliteDb.get("SELECT * FROM users WHERE username = ?", "guru");
   if (!guru) {
-    sqliteDb.prepare("INSERT INTO users (username, password, name, role) VALUES (?, ?, ?, ?)").run("guru", "guru123", "Guru Contoh", "guru");
+    await sqliteDb.run("INSERT INTO users (username, password, name, role) VALUES (?, ?, ?, ?)", "guru", "guru123", "Guru Contoh", "guru");
   }
-  const geo = sqliteDb.prepare("SELECT * FROM geolocations").get();
+  const geo = await sqliteDb.get("SELECT * FROM geolocations");
   if (!geo) {
-    sqliteDb.prepare("INSERT INTO geolocations (name, latitude, longitude, radius) VALUES (?, ?, ?, ?)").run("Sekolah", -6.2000, 106.8166, 100);
+    await sqliteDb.run("INSERT INTO geolocations (name, latitude, longitude, radius) VALUES (?, ?, ?, ?)", "Sekolah", -6.2000, 106.8166, 100);
   }
   
   console.log("Using SQLite Database (Preview Mode)");
   } catch (err) {
-    console.error("Critical Error: better-sqlite3 is not installed and MySQL is not configured.");
+    console.error("Critical Error: SQLite initialization failed.");
+    console.error(err);
     console.error("Please configure MySQL in .env (DB_HOST, etc.) for Hostinger production.");
   }
 }
