@@ -1,0 +1,8 @@
+{
+  "name": "ABSEN & JURNAL SMKN 1 POCO RANAKA",
+  "description": "Platform absensi online dengan fitur geolocation, pencatatan waktu real-time, dan riwayat kehadiran.",
+  "requestFramePermissions": [
+    "geolocation",
+    "camera"
+  ]
+}
