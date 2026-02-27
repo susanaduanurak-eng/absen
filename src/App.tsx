@@ -66,6 +66,9 @@ const RealtimeMap = React.memo(({ center, zoom = 16, children, showLiveLabel = t
         <TileLayer 
           url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
           attribution='&copy; OpenStreetMap'
+          updateWhenIdle={true}
+          updateWhenZooming={false}
+          keepBuffer={2}
         />
         <Marker position={center} />
         {children}
@@ -121,6 +124,29 @@ type Tab = 'beranda' | 'absensi' | 'jurnal' | 'izin' | 'admin';
 export default function App() {
   const [user, setUser] = useState<UserData | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('beranda');
+  const [history, setHistory] = useState<Tab[]>(['beranda']);
+
+  // Handle Back Button
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      if (event.state && event.state.tab) {
+        setActiveTab(event.state.tab);
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    
+    // Initial state
+    window.history.replaceState({ tab: 'beranda' }, '');
+    
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const changeTab = (tab: Tab) => {
+    if (tab !== activeTab) {
+      window.history.pushState({ tab }, '');
+      setActiveTab(tab);
+    }
+  };
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState<Stats>({ totalUsers: 0, todayAttendance: 0, pendingPermissions: 0 });
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -250,7 +276,7 @@ export default function App() {
         setMessage({ text: "Jurnal berhasil disimpan!", type: 'success' });
         setJournalContent('');
         setJournalSelfie(null);
-        setActiveTab('beranda');
+        changeTab('beranda');
       }
     } catch (err) {
       setMessage({ text: "Gagal menyimpan jurnal", type: 'error' });
@@ -281,7 +307,7 @@ export default function App() {
         setMessage({ text: "Pengajuan izin berhasil dikirim!", type: 'success' });
         setPermissionReason('');
         setPermissionFile(null);
-        setActiveTab('beranda');
+        changeTab('beranda');
       }
     } catch (err) {
       setMessage({ text: "Gagal mengirim izin", type: 'error' });
@@ -511,7 +537,12 @@ export default function App() {
 
   const startCamera = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { 
+          facingMode: 'user',
+          aspectRatio: { ideal: 3/4 }
+        } 
+      });
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
       }
@@ -569,7 +600,7 @@ export default function App() {
         setAttendanceStep(1);
         setAttendanceType(null);
         setCapturedSelfie(null);
-        setActiveTab('beranda');
+        changeTab('beranda');
         fetchStats();
         fetchUserHistory();
       } else {
@@ -927,8 +958,8 @@ export default function App() {
                 <div className="w-full space-y-8">
                   {!capturedSelfie ? (
                     <>
-                      <div className="relative w-full aspect-video bg-zinc-900 rounded-3xl overflow-hidden shadow-2xl">
-                        <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
+                      <div className="relative w-full aspect-[3/4] bg-zinc-900 rounded-3xl overflow-hidden shadow-2xl">
+                        <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover scale-x-[-1]" />
                         <div className="absolute inset-0 border-2 border-white/20 pointer-events-none"></div>
                         <div className="absolute bottom-4 left-4 right-4 flex justify-between items-end">
                           <div className="text-left text-white/80 text-[10px] font-bold uppercase tracking-widest">
@@ -946,7 +977,7 @@ export default function App() {
                     </>
                   ) : (
                     <>
-                      <div className="w-full aspect-video bg-zinc-100 rounded-3xl overflow-hidden shadow-2xl border-4 border-white">
+                      <div className="w-full aspect-[3/4] bg-zinc-100 rounded-3xl overflow-hidden shadow-2xl border-4 border-white">
                         <img src={capturedSelfie} className="w-full h-full object-cover" />
                       </div>
                       <div className="flex gap-4">
@@ -1566,7 +1597,7 @@ export default function App() {
           return (
             <button 
               key={item.id}
-              onClick={() => setActiveTab(item.id as Tab)}
+              onClick={() => changeTab(item.id as Tab)}
               className={`flex flex-col items-center gap-1.5 px-6 py-3 rounded-2xl transition-all relative group ${
                 active ? 'bg-blue-600 text-white shadow-xl shadow-blue-200' : 'text-zinc-400 hover:text-zinc-900'
               }`}
