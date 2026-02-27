@@ -343,6 +343,26 @@ export default function App() {
   const [newGeoLat, setNewGeoLat] = useState('');
   const [newGeoLng, setNewGeoLng] = useState('');
   const [newGeoRadius, setNewGeoRadius] = useState('100');
+  const [addressSearch, setAddressSearch] = useState('');
+  const [geoSearchResults, setGeoSearchResults] = useState<any[]>([]);
+  const [isSearchingAddress, setIsSearchingAddress] = useState(false);
+
+  const handleAddressSearch = async () => {
+    if (!addressSearch.trim()) return;
+    setIsSearchingAddress(true);
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(addressSearch)}&limit=5`);
+      const data = await res.json();
+      setGeoSearchResults(data);
+      if (data.length === 0) {
+        setMessage({ text: "Alamat tidak ditemukan", type: 'error' });
+      }
+    } catch (err) {
+      setMessage({ text: "Gagal mencari alamat", type: 'error' });
+    } finally {
+      setIsSearchingAddress(false);
+    }
+  };
 
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -450,6 +470,8 @@ export default function App() {
         setNewGeoName('');
         setNewGeoLat('');
         setNewGeoLng('');
+        setAddressSearch('');
+        setGeoSearchResults([]);
         fetchAdminData();
       }
     } catch (err) {
@@ -1508,6 +1530,51 @@ export default function App() {
                         >
                           <MapPin className="w-4 h-4" /> Gunakan Lokasi Saya
                         </button>
+                        
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest ml-1">Cari Alamat</label>
+                          <div className="flex gap-2">
+                            <input 
+                              type="text" 
+                              value={addressSearch}
+                              onChange={(e) => setAddressSearch(e.target.value)}
+                              placeholder="Masukkan nama jalan/tempat..."
+                              className="flex-1 bg-zinc-50 border border-zinc-200 rounded-2xl py-3 px-4 font-bold text-zinc-700 outline-none focus:ring-2 focus:ring-blue-500/20"
+                              onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddressSearch())}
+                            />
+                            <button 
+                              type="button"
+                              onClick={handleAddressSearch}
+                              disabled={isSearchingAddress}
+                              className="bg-blue-600 text-white px-4 rounded-2xl flex items-center justify-center disabled:opacity-50"
+                            >
+                              <Search className="w-4 h-4" />
+                            </button>
+                          </div>
+                          
+                          {geoSearchResults.length > 0 && (
+                            <div className="bg-white border border-zinc-100 rounded-2xl shadow-xl overflow-hidden mt-2 max-h-48 overflow-y-auto">
+                              {geoSearchResults.map((res, i) => (
+                                <button
+                                  key={i}
+                                  type="button"
+                                  onClick={() => {
+                                    setNewGeoLat(parseFloat(res.lat).toFixed(6));
+                                    setNewGeoLng(parseFloat(res.lon).toFixed(6));
+                                    setNewGeoName(res.display_name.split(',')[0]);
+                                    setGeoSearchResults([]);
+                                    setAddressSearch('');
+                                  }}
+                                  className="w-full text-left p-3 hover:bg-zinc-50 border-b border-zinc-50 last:border-0 transition-colors"
+                                >
+                                  <p className="text-xs font-bold text-zinc-900 truncate">{res.display_name}</p>
+                                  <p className="text-[9px] text-zinc-400 font-medium">Lat: {res.lat}, Lng: {res.lon}</p>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
                         <div className="h-px bg-zinc-100 w-full"></div>
                       </div>
 
