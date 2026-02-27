@@ -1,6 +1,5 @@
 import express from "express";
 import { createServer as createViteServer } from "vite";
-import Database from "better-sqlite3";
 import mysql from "mysql2/promise";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -29,41 +28,43 @@ async function initDB() {
       console.log("Connected to MySQL Database");
     } catch (err) {
       console.error("Failed to connect to MySQL, falling back to SQLite:", err);
-      setupSQLite();
+      await setupSQLite();
     }
   } else {
-    setupSQLite();
+    await setupSQLite();
   }
 }
 
-function setupSQLite() {
-  const sqliteDb = new Database("attendance.db");
-  isMySQL = false;
-  
-  // Wrapper to mimic mysql2/promise for simple queries
-  db = {
-    execute: async (sql: string, params: any[] = []) => {
-      const stmt = sqliteDb.prepare(sql.replace(/\?/g, (match, offset, string) => {
-        // SQLite uses ? for params too, but we might need to handle named params if we used them
-        return '?';
-      }));
-      
-      if (sql.trim().toUpperCase().startsWith("SELECT")) {
+async function setupSQLite() {
+  try {
+    const { default: Database } = await import("better-sqlite3");
+    const sqliteDb = new Database("attendance.db");
+    isMySQL = false;
+    
+    // Wrapper to mimic mysql2/promise for simple queries
+    db = {
+      execute: async (sql: string, params: any[] = []) => {
+        const stmt = sqliteDb.prepare(sql.replace(/\?/g, (match, offset, string) => {
+          // SQLite uses ? for params too, but we might need to handle named params if we used them
+          return '?';
+        }));
+        
+        if (sql.trim().toUpperCase().startsWith("SELECT")) {
+          const rows = stmt.all(...params);
+          return [rows];
+        } else {
+          const result = stmt.run(...params);
+          return [{ insertId: result.lastInsertRowid, affectedRows: result.changes }];
+        }
+      },
+      query: async (sql: string, params: any[] = []) => {
+        const stmt = sqliteDb.prepare(sql);
         const rows = stmt.all(...params);
         return [rows];
-      } else {
-        const result = stmt.run(...params);
-        return [{ insertId: result.lastInsertRowid, affectedRows: result.changes }];
       }
-    },
-    query: async (sql: string, params: any[] = []) => {
-      const stmt = sqliteDb.prepare(sql);
-      const rows = stmt.all(...params);
-      return [rows];
-    }
-  };
+    };
 
-  sqliteDb.exec(`
+    sqliteDb.exec(`
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       username TEXT UNIQUE,
@@ -141,8 +142,11 @@ function setupSQLite() {
   }
   
   console.log("Using SQLite Database (Preview Mode)");
+  } catch (err) {
+    console.error("Critical Error: better-sqlite3 is not installed and MySQL is not configured.");
+    console.error("Please configure MySQL in .env (DB_HOST, etc.) for Hostinger production.");
+  }
 }
-
 async function startServer() {
   await initDB();
   
