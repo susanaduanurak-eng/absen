@@ -724,34 +724,34 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] font-sans pb-32">
+    <div className="min-h-screen bg-[#F8FAFC] font-sans pb-24 md:pb-32">
       {/* Top Header */}
-      <header className="bg-white px-8 py-5 flex justify-between items-center sticky top-0 z-30 border-b border-zinc-100">
-        <h1 className="text-xl font-extrabold text-blue-600 tracking-tight">ABSENSI & JURNAL SMKN 1 POCO RANAKA</h1>
-        <div className="flex items-center gap-4">
+      <header className="bg-white px-4 md:px-8 py-4 md:py-5 flex justify-between items-center sticky top-0 z-30 border-b border-zinc-100">
+        <h1 className="text-lg md:text-xl font-extrabold text-blue-600 tracking-tight truncate mr-4">SMKN 1 POCO RANAKA</h1>
+        <div className="flex items-center gap-2 md:gap-4">
           <button className="p-2 text-zinc-400 hover:bg-zinc-50 rounded-full transition-colors relative">
-            <Bell className="w-6 h-6" />
-            <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
+            <Bell className="w-5 h-5 md:w-6 md:h-6" />
+            <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-red-500 rounded-full border-2 border-white"></span>
           </button>
           <button 
             onClick={() => setUser(null)}
-            className="flex items-center gap-2 px-4 py-2 text-zinc-500 font-bold text-xs uppercase tracking-widest hover:text-red-500 transition-colors"
+            className="flex items-center gap-1 md:gap-2 px-2 md:px-4 py-2 text-zinc-500 font-bold text-[10px] md:text-xs uppercase tracking-widest hover:text-red-500 transition-colors"
           >
-            <LogOut className="w-4 h-4" />
-            Keluar
+            <LogOut className="w-3 h-3 md:w-4 md:h-4" />
+            <span className="hidden sm:inline">Keluar</span>
           </button>
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto p-6 lg:p-10 space-y-8">
+      <main className="max-w-5xl mx-auto p-4 md:p-6 lg:p-10 space-y-6 md:space-y-8">
         
         {activeTab === 'beranda' && (
           <div className="space-y-8">
             {/* Hero Card */}
-            <section className="bg-white rounded-[40px] p-10 border border-zinc-100 shadow-sm relative overflow-hidden flex flex-col md:flex-row justify-between items-center gap-8">
+            <section className="bg-white rounded-[32px] md:rounded-[40px] p-6 md:p-10 border border-zinc-100 shadow-sm relative overflow-hidden flex flex-col md:flex-row justify-between items-center gap-6 md:gap-8">
               <div className="space-y-2 text-center md:text-left">
-                <h2 className="text-3xl font-extrabold text-zinc-900">Halo, {user.name}!</h2>
-                <p className="text-zinc-400 font-bold uppercase tracking-[0.2em] text-xs">
+                <h2 className="text-2xl md:text-3xl font-extrabold text-zinc-900">Halo, {user.name}!</h2>
+                <p className="text-zinc-400 font-bold uppercase tracking-[0.2em] text-[10px] md:text-xs">
                   {currentTime.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long' })}
                 </p>
                 <div className="mt-4">
@@ -767,7 +767,7 @@ export default function App() {
                 </div>
               </div>
               <div className="text-center md:text-right space-y-1">
-                <p className="text-6xl font-black text-blue-600 tracking-tighter">
+                <p className="text-5xl md:text-6xl font-black text-blue-600 tracking-tighter">
                   {currentTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
                 </p>
                 <p className="text-zinc-400 text-[10px] font-bold uppercase tracking-widest">Waktu Server Aktif</p>
@@ -775,25 +775,25 @@ export default function App() {
             </section>
 
             {/* Real-time Proximity Card */}
-            <section className={`rounded-[32px] p-6 border flex items-center justify-between transition-all ${
+            <section className={`rounded-[24px] md:rounded-[32px] p-4 md:p-6 border flex flex-col sm:flex-row items-center justify-between gap-4 transition-all ${
               isWithinArea ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-amber-50 border-amber-100 text-amber-700'
             }`}>
-              <div className="flex items-center gap-5">
-                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-sm ${
+              <div className="flex items-center gap-4 md:gap-5 w-full sm:w-auto">
+                <div className={`w-12 h-12 md:w-14 md:h-14 rounded-2xl flex items-center justify-center shadow-sm flex-shrink-0 ${
                   isWithinArea ? 'bg-white text-emerald-500' : 'bg-white text-amber-500'
                 }`}>
-                  <MapPin className="w-7 h-7" />
+                  <MapPin className="w-6 h-6 md:w-7 md:h-7" />
                 </div>
                 <div>
-                  <h4 className="font-extrabold">{isWithinArea ? 'Dalam Area Sekolah' : 'Luar Area Sekolah'}</h4>
-                  <p className="text-xs font-medium opacity-80">
+                  <h4 className="font-extrabold text-sm md:text-base">{isWithinArea ? 'Dalam Area Sekolah' : 'Luar Area Sekolah'}</h4>
+                  <p className="text-[10px] md:text-xs font-medium opacity-80">
                     {distance !== null 
-                      ? `Jarak Anda: ${Math.round(distance)} meter dari titik presensi.` 
-                      : 'Mendeteksi lokasi Anda...'}
+                      ? `Jarak: ${Math.round(distance)}m dari titik presensi.` 
+                      : 'Mendeteksi lokasi...'}
                   </p>
                 </div>
               </div>
-              <div className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border ${
+              <div className={`w-full sm:w-auto text-center px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border ${
                 isWithinArea ? 'bg-emerald-100 border-emerald-200' : 'bg-amber-100 border-amber-200'
               }`}>
                 {isWithinArea ? 'SIAP ABSEN' : 'BELUM SIAP'}
@@ -801,37 +801,37 @@ export default function App() {
             </section>
 
             {/* Stats Grid */}
-            <section className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+            <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
               {[
                 { label: 'Total Hadir', val: stats.todayAttendance, icon: CheckCircle2, color: 'emerald' },
                 { label: 'Jurnal Terisi', val: 0, icon: BookOpen, color: 'blue' },
                 { label: 'Izin Disetujui', val: 0, icon: FileText, color: 'purple' },
                 { label: 'Ketepatan Waktu', val: '94%', icon: Clock, color: 'indigo' },
               ].map((s, i) => (
-                <div key={i} className="bg-white p-6 rounded-[32px] border border-zinc-100 shadow-sm space-y-4">
-                  <div className={`w-12 h-12 bg-${s.color}-50 rounded-2xl flex items-center justify-center text-${s.color}-600`}>
-                    <s.icon className="w-6 h-6" />
+                <div key={i} className="bg-white p-4 md:p-6 rounded-[24px] md:rounded-[32px] border border-zinc-100 shadow-sm space-y-3 md:space-y-4">
+                  <div className={`w-10 h-10 md:w-12 md:h-12 bg-${s.color}-50 rounded-xl md:rounded-2xl flex items-center justify-center text-${s.color}-600`}>
+                    <s.icon className="w-5 h-5 md:w-6 md:h-6" />
                   </div>
                   <div>
-                    <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">{s.label}</p>
-                    <p className="text-3xl font-black text-zinc-900 tracking-tighter">{s.val}</p>
+                    <p className="text-[9px] md:text-[10px] font-black text-zinc-400 uppercase tracking-widest">{s.label}</p>
+                    <p className="text-2xl md:text-3xl font-black text-zinc-900 tracking-tighter">{s.val}</p>
                   </div>
                 </div>
               ))}
             </section>
 
             {/* Warning Card */}
-            <section className="bg-red-50 border border-red-100 rounded-[32px] p-6 flex items-center justify-between group cursor-pointer hover:bg-red-100 transition-colors">
-              <div className="flex items-center gap-5">
-                <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-red-500 shadow-sm">
-                  <Clock className="w-7 h-7" />
+            <section className="bg-red-50 border border-red-100 rounded-[24px] md:rounded-[32px] p-4 md:p-6 flex items-center justify-between group cursor-pointer hover:bg-red-100 transition-colors">
+              <div className="flex items-center gap-4 md:gap-5">
+                <div className="w-12 h-12 md:w-14 md:h-14 bg-white rounded-xl md:rounded-2xl flex items-center justify-center text-red-500 shadow-sm">
+                  <Clock className="w-6 h-6 md:w-7 md:h-7" />
                 </div>
                 <div>
-                  <h4 className="font-extrabold text-zinc-900">Peringatan: Terlambat</h4>
-                  <p className="text-zinc-500 text-xs font-medium">Batas absen pukul 08:30. Segera lakukan presensi!</p>
+                  <h4 className="font-extrabold text-zinc-900 text-sm md:text-base">Peringatan: Terlambat</h4>
+                  <p className="text-zinc-500 text-[10px] md:text-xs font-medium">Batas absen pukul 08:30. Segera lakukan presensi!</p>
                 </div>
               </div>
-              <ChevronRight className="w-6 h-6 text-zinc-300 group-hover:text-red-500 transition-colors" />
+              <ChevronRight className="w-5 h-5 md:w-6 md:h-6 text-zinc-300 group-hover:text-red-500 transition-colors" />
             </section>
 
             {/* History Section */}
@@ -1296,8 +1296,8 @@ export default function App() {
             )}
 
             {adminTab === 'Manajemen User' && (
-              <div className="bg-white rounded-[40px] border border-zinc-100 shadow-sm overflow-hidden">
-                <table className="w-full text-left">
+              <div className="bg-white rounded-[32px] md:rounded-[40px] border border-zinc-100 shadow-sm overflow-hidden overflow-x-auto">
+                <table className="w-full text-left min-w-[600px]">
                   <thead>
                     <tr className="bg-zinc-50 border-b border-zinc-100">
                       <th className="px-8 py-5 text-[10px] font-black text-zinc-400 uppercase tracking-widest">Nama / NIP</th>
@@ -1353,8 +1353,8 @@ export default function App() {
             )}
 
             {adminTab === 'Log Absen' && (
-              <div className="bg-white rounded-[40px] border border-zinc-100 shadow-sm overflow-hidden">
-                <table className="w-full text-left">
+              <div className="bg-white rounded-[32px] md:rounded-[40px] border border-zinc-100 shadow-sm overflow-hidden overflow-x-auto">
+                <table className="w-full text-left min-w-[700px]">
                   <thead>
                     <tr className="bg-zinc-50 border-b border-zinc-100">
                       <th className="px-8 py-5 text-[10px] font-black text-zinc-400 uppercase tracking-widest">User</th>
@@ -1386,10 +1386,10 @@ export default function App() {
             )}
 
             {adminTab === 'Jurnal' && (
-              <div className="grid gap-6">
+              <div className="grid gap-4 md:gap-6">
                 {Array.isArray(adminJournals) && adminJournals.map(j => (
-                  <div key={j.id} className="bg-white p-8 rounded-[40px] border border-zinc-100 shadow-sm flex gap-8">
-                    <div className="w-32 h-32 bg-zinc-100 rounded-3xl overflow-hidden flex-shrink-0">
+                  <div key={j.id} className="bg-white p-5 md:p-8 rounded-[32px] md:rounded-[40px] border border-zinc-100 shadow-sm flex flex-col sm:flex-row gap-4 md:gap-8">
+                    <div className="w-full sm:w-32 h-48 sm:h-32 bg-zinc-100 rounded-2xl md:rounded-3xl overflow-hidden flex-shrink-0">
                       {j.selfie ? (
                         <img src={j.selfie} className="w-full h-full object-cover" />
                       ) : (
@@ -1424,8 +1424,8 @@ export default function App() {
             )}
 
             {adminTab === 'Izin' && (
-              <div className="bg-white rounded-[40px] border border-zinc-100 shadow-sm overflow-hidden">
-                <table className="w-full text-left">
+              <div className="bg-white rounded-[32px] md:rounded-[40px] border border-zinc-100 shadow-sm overflow-hidden overflow-x-auto">
+                <table className="w-full text-left min-w-[800px]">
                   <thead>
                     <tr className="bg-zinc-50 border-b border-zinc-100">
                       <th className="px-8 py-5 text-[10px] font-black text-zinc-400 uppercase tracking-widest">User</th>
@@ -1463,8 +1463,8 @@ export default function App() {
             {adminTab === 'Pengaturan' && (
               <div className="grid md:grid-cols-2 gap-8">
                 {/* Manage Classes */}
-                <div className="bg-white p-8 rounded-[40px] border border-zinc-100 shadow-sm space-y-6">
-                  <h4 className="text-xl font-black text-zinc-900">Manajemen Kelas</h4>
+                <div className="bg-white p-6 md:p-8 rounded-[32px] md:rounded-[40px] border border-zinc-100 shadow-sm space-y-6">
+                  <h4 className="text-lg md:text-xl font-black text-zinc-900">Manajemen Kelas</h4>
                   <form onSubmit={handleAddClass} className="flex gap-2">
                     <input 
                       type="text" 
@@ -1484,8 +1484,8 @@ export default function App() {
                 </div>
 
                 {/* Manage Subjects */}
-                <div className="bg-white p-8 rounded-[40px] border border-zinc-100 shadow-sm space-y-6">
-                  <h4 className="text-xl font-black text-zinc-900">Manajemen Mata Pelajaran</h4>
+                <div className="bg-white p-6 md:p-8 rounded-[32px] md:rounded-[40px] border border-zinc-100 shadow-sm space-y-6">
+                  <h4 className="text-lg md:text-xl font-black text-zinc-900">Manajemen Mata Pelajaran</h4>
                   <form onSubmit={handleAddSubject} className="flex gap-2">
                     <input 
                       type="text" 
@@ -1505,9 +1505,9 @@ export default function App() {
                 </div>
 
                 {/* Manage Geolocations */}
-                <div className="bg-white p-8 rounded-[40px] border border-zinc-100 shadow-sm space-y-6 md:col-span-2">
-                  <div className="flex justify-between items-center">
-                    <h4 className="text-xl font-black text-zinc-900">Manajemen Geolokasi (Area Absen)</h4>
+                <div className="bg-white p-6 md:p-8 rounded-[32px] md:rounded-[40px] border border-zinc-100 shadow-sm space-y-6 md:col-span-2">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <h4 className="text-lg md:text-xl font-black text-zinc-900">Manajemen Geolokasi (Area Absen)</h4>
                     <span className="px-4 py-1.5 bg-blue-50 text-blue-600 text-[10px] font-black uppercase tracking-widest rounded-full border border-blue-100">
                       Interactive Map
                     </span>
@@ -1687,33 +1687,53 @@ export default function App() {
         )}
       </main>
 
-      {/* Bottom Navigation */}
-      <nav className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-white/80 backdrop-blur-2xl border border-white/50 rounded-[32px] px-4 py-3 flex items-center gap-2 shadow-2xl z-50">
+      {/* Bottom Navigation for Mobile */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-zinc-100 px-2 py-2 flex justify-around items-center z-50 md:hidden shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
+        {[
+          { id: 'beranda', icon: LayoutDashboard, label: 'Beranda' },
+          { id: 'absensi', icon: MapPin, label: 'Absen' },
+          { id: 'jurnal', icon: BookOpen, label: 'Jurnal' },
+          { id: 'izin', icon: Calendar, label: 'Izin' },
+          ...(user.role === 'admin' ? [{ id: 'admin', icon: ShieldCheck, label: 'Admin' }] : []),
+        ].map((item) => {
+          const active = activeTab === item.id;
+          return (
+            <button
+              key={item.id}
+              onClick={() => changeTab(item.id as Tab)}
+              className={`flex flex-col items-center gap-1 px-3 py-1 rounded-xl transition-all ${
+                active ? 'text-blue-600' : 'text-zinc-400'
+              }`}
+            >
+              <item.icon className={`w-5 h-5 ${active ? 'scale-110' : ''}`} />
+              <span className="text-[8px] font-black uppercase tracking-widest">{item.label}</span>
+            </button>
+          );
+        })}
+      </nav>
+
+      {/* Sidebar Navigation for Desktop */}
+      <nav className="fixed left-8 top-1/2 -translate-y-1/2 bg-white border border-zinc-100 rounded-[40px] p-3 hidden md:flex flex-col gap-4 shadow-2xl shadow-zinc-200/50 z-40">
         {[
           { id: 'beranda', icon: LayoutDashboard, label: 'Beranda' },
           { id: 'absensi', icon: MapPin, label: 'Absensi' },
           { id: 'jurnal', icon: BookOpen, label: 'Jurnal' },
           { id: 'izin', icon: Calendar, label: 'Izin' },
-          { id: 'admin', icon: ShieldCheck, label: 'Admin', adminOnly: true },
-        ].map(item => {
-          if (item.adminOnly && user.role !== 'admin') return null;
+          ...(user.role === 'admin' ? [{ id: 'admin', icon: ShieldCheck, label: 'Admin' }] : []),
+        ].map((item) => {
           const active = activeTab === item.id;
           return (
-            <button 
+            <button
               key={item.id}
               onClick={() => changeTab(item.id as Tab)}
-              className={`flex flex-col items-center gap-1.5 px-6 py-3 rounded-2xl transition-all relative group ${
-                active ? 'bg-blue-600 text-white shadow-xl shadow-blue-200' : 'text-zinc-400 hover:text-zinc-900'
+              className={`w-14 h-14 rounded-3xl flex items-center justify-center transition-all relative group ${
+                active ? 'bg-blue-600 text-white shadow-xl shadow-blue-200' : 'text-zinc-400 hover:text-zinc-900 hover:bg-zinc-50'
               }`}
             >
-              <item.icon className={`w-6 h-6 ${active ? 'scale-110' : 'group-hover:scale-110'} transition-transform`} />
-              <span className="text-[9px] font-black uppercase tracking-widest">{item.label}</span>
-              {active && (
-                <motion.div 
-                  layoutId="nav-dot"
-                  className="absolute -bottom-1 w-1 h-1 bg-white rounded-full"
-                />
-              )}
+              <item.icon className="w-6 h-6" />
+              <span className="absolute left-full ml-4 px-3 py-1.5 bg-zinc-900 text-white text-[10px] font-black uppercase tracking-widest rounded-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all whitespace-nowrap">
+                {item.label}
+              </span>
             </button>
           );
         })}
