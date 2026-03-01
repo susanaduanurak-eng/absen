@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Clock, 
   MapPin, 
@@ -42,13 +42,16 @@ function MapUpdater({ center }: { center: [number, number] }) {
   const map = useMap();
   useEffect(() => {
     if (center[0] !== 0 && center[1] !== 0) {
-      map.flyTo(center, map.getZoom(), { animate: true, duration: 1 });
+      // Use setView instead of flyTo for instantaneous update
+      map.setView(center, map.getZoom(), { animate: false });
     }
-  }, [center, map]);
+  }, [center[0], center[1], map]);
   return null;
 }
 
-const RealtimeMap = React.memo(({ center, zoom = 16, children, showLiveLabel = true, interactive = true }: { center: [number, number], zoom?: number, children?: React.ReactNode, showLiveLabel?: boolean, interactive?: boolean }) => {
+const RealtimeMap = React.memo(({ lat, lng, zoom = 16, children, showLiveLabel = true, interactive = true }: { lat: number, lng: number, zoom?: number, children?: React.ReactNode, showLiveLabel?: boolean, interactive?: boolean }) => {
+  const center: [number, number] = useMemo(() => [lat, lng], [lat, lng]);
+  
   return (
     <div className="w-full h-full relative z-10 bg-zinc-100">
       <MapContainer 
@@ -65,11 +68,13 @@ const RealtimeMap = React.memo(({ center, zoom = 16, children, showLiveLabel = t
         keyboard={false}
       >
         <TileLayer 
-          url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+          url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png"
           attribution='&copy; OpenStreetMap'
-          updateWhenIdle={true}
+          updateWhenIdle={false}
           updateWhenZooming={false}
-          keepBuffer={2}
+          keepBuffer={4}
+          tileSize={256}
+          zoomOffset={0}
         />
         <Marker position={center} />
         {children}
@@ -1053,7 +1058,7 @@ export default function App() {
 
                   {location && (
                     <div className="w-full h-[250px] rounded-3xl overflow-hidden border border-zinc-100 shadow-inner">
-                      <RealtimeMap center={[location.lat, location.lng]}>
+                      <RealtimeMap lat={location.lat} lng={location.lng}>
                         {adminGeos.map(geo => (
                           <Circle 
                             key={geo.id}
@@ -1199,7 +1204,7 @@ export default function App() {
                 </div>
                 {location ? (
                   <div className="w-full h-[200px] rounded-3xl overflow-hidden border border-zinc-100 shadow-inner">
-                    <RealtimeMap center={[location.lat, location.lng]} zoom={15} />
+                    <RealtimeMap lat={location.lat} lng={location.lng} zoom={15} />
                   </div>
                 ) : (
                   <div className="w-full h-[200px] bg-zinc-50 rounded-3xl border border-zinc-100 flex items-center justify-center">
@@ -1752,7 +1757,8 @@ export default function App() {
 
                     <div className="lg:col-span-2 h-[450px] rounded-[32px] overflow-hidden border border-zinc-100 shadow-inner">
                       <RealtimeMap 
-                        center={adminGeos.length > 0 ? [Number(adminGeos[0].latitude), Number(adminGeos[0].longitude)] : [-6.2000, 106.8166]} 
+                        lat={adminGeos.length > 0 ? Number(adminGeos[0].latitude) : -6.2000} 
+                        lng={adminGeos.length > 0 ? Number(adminGeos[0].longitude) : 106.8166} 
                         zoom={15}
                         showLiveLabel={false}
                       >
