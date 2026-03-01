@@ -41,9 +41,9 @@ L.Icon.Default.mergeOptions({
 function MapUpdater({ center }: { center: [number, number] }) {
   const map = useMap();
   useEffect(() => {
-    if (center[0] !== 0 && center[1] !== 0) {
-      // Use setView instead of flyTo for instantaneous update
-      map.setView(center, map.getZoom(), { animate: false });
+    if (typeof center[0] === 'number' && typeof center[1] === 'number' && !isNaN(center[0]) && !isNaN(center[1])) {
+      // Use flyTo with very short duration for a smooth but fast update
+      map.flyTo(center, map.getZoom(), { animate: true, duration: 0.3 });
     }
   }, [center[0], center[1], map]);
   return null;
@@ -52,6 +52,15 @@ function MapUpdater({ center }: { center: [number, number] }) {
 const RealtimeMap = React.memo(({ lat, lng, zoom = 16, children, showLiveLabel = true, interactive = true }: { lat: number, lng: number, zoom?: number, children?: React.ReactNode, showLiveLabel?: boolean, interactive?: boolean }) => {
   const center: [number, number] = useMemo(() => [lat, lng], [lat, lng]);
   
+  // Safety check to prevent crash if coordinates are invalid
+  if (typeof lat !== 'number' || typeof lng !== 'number' || isNaN(lat) || isNaN(lng)) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-zinc-50 text-zinc-400 text-[10px] font-bold uppercase tracking-widest">
+        Lokasi tidak valid
+      </div>
+    );
+  }
+
   return (
     <div className="w-full h-full relative z-10 bg-zinc-100">
       <MapContainer 
@@ -68,13 +77,11 @@ const RealtimeMap = React.memo(({ lat, lng, zoom = 16, children, showLiveLabel =
         keyboard={false}
       >
         <TileLayer 
-          url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png"
+          url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
           attribution='&copy; OpenStreetMap'
           updateWhenIdle={false}
           updateWhenZooming={false}
           keepBuffer={4}
-          tileSize={256}
-          zoomOffset={0}
         />
         <Marker position={center} />
         {children}
