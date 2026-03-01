@@ -483,24 +483,38 @@ export default function App() {
     }
   };
 
-  const startJournalCamera = async () => {
-    // Stop existing stream
-    if (journalVideoRef.current?.srcObject) {
-      const stream = journalVideoRef.current.srcObject as MediaStream;
-      stream.getTracks().forEach(track => track.stop());
+  const stopStream = (videoElement: HTMLVideoElement | null) => {
+    if (videoElement && videoElement.srcObject) {
+      const stream = videoElement.srcObject as MediaStream;
+      stream.getTracks().forEach(track => {
+        track.stop();
+        track.enabled = false;
+      });
+      videoElement.srcObject = null;
     }
+  };
+
+  const startJournalCamera = async () => {
+    stopStream(journalVideoRef.current);
+    
+    // Small delay to let the browser release the hardware
+    await new Promise(resolve => setTimeout(resolve, 100));
 
     setShowJournalCamera(true);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: facingMode } 
+        video: { 
+          facingMode: facingMode,
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        } 
       });
       if (journalVideoRef.current) {
         journalVideoRef.current.srcObject = stream;
       }
     } catch (err) {
-      console.error("Camera error:", err);
-      setMessage({ text: "Gagal mengakses kamera", type: 'error' });
+      console.error("Journal Camera error:", err);
+      setMessage({ text: "Gagal mengakses kamera jurnal. Pastikan izin kamera diberikan.", type: 'error' });
       setShowJournalCamera(false);
     }
   };
@@ -509,22 +523,18 @@ export default function App() {
     if (showJournalCamera) {
       startJournalCamera();
     } else {
-      if (journalVideoRef.current?.srcObject) {
-        const stream = journalVideoRef.current.srcObject as MediaStream;
-        stream.getTracks().forEach(track => track.stop());
-      }
+      stopStream(journalVideoRef.current);
     }
+    return () => stopStream(journalVideoRef.current);
   }, [showJournalCamera, facingMode]);
 
   useEffect(() => {
     if (attendanceStep === 3 && !capturedSelfie) {
       startCamera();
     } else {
-      if (videoRef.current?.srcObject) {
-        const stream = videoRef.current.srcObject as MediaStream;
-        stream.getTracks().forEach(track => track.stop());
-      }
+      stopStream(videoRef.current);
     }
+    return () => stopStream(videoRef.current);
   }, [attendanceStep, capturedSelfie, facingMode]);
 
   const takeJournalPhoto = () => {
@@ -651,25 +661,26 @@ export default function App() {
   };
 
   const startCamera = async () => {
-    // Stop existing stream
-    if (videoRef.current?.srcObject) {
-      const stream = videoRef.current.srcObject as MediaStream;
-      stream.getTracks().forEach(track => track.stop());
-    }
+    stopStream(videoRef.current);
+    
+    // Small delay to let the browser release the hardware
+    await new Promise(resolve => setTimeout(resolve, 100));
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: { 
           facingMode: facingMode,
-          aspectRatio: { ideal: 3/4 }
+          aspectRatio: { ideal: 3/4 },
+          width: { ideal: 720 },
+          height: { ideal: 960 }
         } 
       });
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
       }
     } catch (err) {
-      console.error("Camera error:", err);
-      setMessage({ text: "Gagal mengakses kamera", type: 'error' });
+      console.error("Attendance Camera error:", err);
+      setMessage({ text: "Gagal mengakses kamera absen. Pastikan izin kamera diberikan.", type: 'error' });
     }
   };
 
