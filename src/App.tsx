@@ -22,7 +22,8 @@ import {
   Download,
   Bell,
   MoreHorizontal,
-  X
+  X,
+  RefreshCw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MapContainer, TileLayer, Marker, Circle, useMap, Popup } from 'react-leaflet';
@@ -170,6 +171,8 @@ export default function App() {
   const [journalSubject, setJournalSubject] = useState('');
   const [journalContent, setJournalContent] = useState('');
   const [journalSelfie, setJournalSelfie] = useState<string | null>(null);
+  const [showJournalCamera, setShowJournalCamera] = useState(false);
+  const journalVideoRef = useRef<HTMLVideoElement>(null);
 
   // Permission form state
   const [permissionType, setPermissionType] = useState<'sakit' | 'izin'>('sakit');
@@ -466,7 +469,7 @@ export default function App() {
         })
       });
       if ((await res.json()).success) {
-        setMessage({ text: "Geolokasi berhasil ditambahkan", type: 'success' });
+        setMessage({ text: "Lokasi sekolah berhasil diperbarui!", type: 'success' });
         setNewGeoName('');
         setNewGeoLat('');
         setNewGeoLng('');
@@ -480,18 +483,61 @@ export default function App() {
   };
 
   const startJournalCamera = async () => {
+    setShowJournalCamera(true);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      // In a real app, we'd show a modal with the camera
-      // For this demo, we'll just capture a frame if the videoRef is available, 
-      // but since we're in the Journal tab, we might need a separate video element or modal.
-      // Let's just use a simple approach: if we're in the journal tab, we'll show a "Taking Photo" state.
-      alert("Kamera aktif. Mengambil foto...");
-      // Mocking a photo capture for the journal with a slightly different placeholder
-      setJournalSelfie("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==");
-      stream.getTracks().forEach(track => track.stop());
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: 'environment' } 
+      });
+      if (journalVideoRef.current) {
+        journalVideoRef.current.srcObject = stream;
+      }
     } catch (err) {
+      console.error("Camera error:", err);
       setMessage({ text: "Gagal mengakses kamera", type: 'error' });
+      setShowJournalCamera(false);
+    }
+  };
+
+  const takeJournalPhoto = () => {
+    if (journalVideoRef.current) {
+      const canvas = document.createElement('canvas');
+      canvas.width = journalVideoRef.current.videoWidth;
+      canvas.height = journalVideoRef.current.videoHeight;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(journalVideoRef.current, 0, 0);
+        setJournalSelfie(canvas.toDataURL('image/jpeg', 0.8));
+        
+        // Stop camera
+        const stream = journalVideoRef.current.srcObject as MediaStream;
+        if (stream) {
+          stream.getTracks().forEach(track => track.stop());
+        }
+        setShowJournalCamera(false);
+      }
+    }
+  };
+
+  const refreshLocation = () => {
+    if (navigator.geolocation) {
+      setLoading(true);
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+          setLocation(newLoc);
+          checkProximity(newLoc);
+          setLoading(false);
+          setMessage({ text: "Lokasi berhasil diperbarui!", type: 'success' });
+        },
+        (err) => {
+          console.error("Location error:", err);
+          setLoading(false);
+          setMessage({ text: "Gagal mendapatkan lokasi GPS. Pastikan GPS aktif.", type: 'error' });
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    } else {
+      setMessage({ text: "Browser Anda tidak mendukung GPS", type: 'error' });
     }
   };
 
@@ -1094,14 +1140,30 @@ export default function App() {
                 ></textarea>
               </div>
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest ml-1">Lokasi Real-time</label>
+                <div className="flex justify-between items-center ml-1">
+                  <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Lokasi Real-time</label>
+                  <button 
+                    onClick={refreshLocation}
+                    className="flex items-center gap-1 text-[10px] font-black text-blue-600 uppercase tracking-widest hover:text-blue-700"
+                  >
+                    <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} /> Refresh Lokasi
+                  </button>
+                </div>
                 {location ? (
                   <div className="w-full h-[200px] rounded-3xl overflow-hidden border border-zinc-100 shadow-inner">
                     <RealtimeMap center={[location.lat, location.lng]} zoom={15} />
                   </div>
                 ) : (
                   <div className="w-full h-[200px] bg-zinc-50 rounded-3xl border border-zinc-100 flex items-center justify-center">
-                    <p className="text-xs font-bold text-zinc-400 animate-pulse">Mencari lokasi...</p>
+                    <div className="text-center">
+                      <p className="text-xs font-bold text-zinc-400 animate-pulse mb-2">Mencari lokasi...</p>
+                      <button 
+                        onClick={refreshLocation}
+                        className="px-4 py-2 bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl shadow-lg shadow-blue-200"
+                      >
+                        Aktifkan GPS
+                      </button>
+                    </div>
                   </div>
                 )}
                 <p className="text-[9px] text-zinc-400 font-bold uppercase tracking-widest mt-2 ml-1">
@@ -1626,8 +1688,13 @@ export default function App() {
                           />
                         </div>
                         <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all">
-                          Simpan Lokasi
+                          {adminGeos.length > 0 ? 'Perbarui Lokasi Sekolah' : 'Simpan Lokasi Sekolah'}
                         </button>
+                        {adminGeos.length > 0 && (
+                          <p className="text-[9px] text-center font-bold text-zinc-400 uppercase tracking-widest mt-2">
+                            * Menyimpan lokasi baru akan menggantikan lokasi sekolah yang sudah ada.
+                          </p>
+                        )}
                       </form>
                       <div className="p-4 bg-amber-50 border border-amber-100 rounded-2xl">
                         <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-1">Petunjuk</p>
@@ -1665,20 +1732,27 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-6 border-t border-zinc-100">
-                    {adminGeos.map(g => (
-                      <div key={g.id} className="flex justify-between items-center p-5 bg-zinc-50 rounded-3xl border border-zinc-100 hover:bg-white hover:shadow-md transition-all group">
-                        <div className="space-y-1">
-                          <p className="font-black text-zinc-900">{g.name}</p>
-                          <p className="text-[9px] text-zinc-400 font-bold uppercase tracking-widest">
-                            {g.latitude.toFixed(4)}, {g.longitude.toFixed(4)} • {g.radius}m
-                          </p>
-                        </div>
-                        <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-blue-500 border border-zinc-100 group-hover:bg-blue-600 group-hover:text-white transition-all">
-                          <MapPin className="w-5 h-5" />
-                        </div>
+                  <div className="grid grid-cols-1 gap-4 pt-6 border-t border-zinc-100">
+                    <h5 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Lokasi Sekolah Saat Ini:</h5>
+                    {adminGeos.length === 0 ? (
+                      <div className="p-8 bg-zinc-50 rounded-3xl border border-zinc-100 text-center">
+                        <p className="text-xs font-bold text-zinc-400">Belum ada lokasi sekolah yang ditentukan.</p>
                       </div>
-                    ))}
+                    ) : (
+                      adminGeos.map(g => (
+                        <div key={g.id} className="flex justify-between items-center p-5 bg-blue-50/50 rounded-3xl border border-blue-100 hover:bg-white hover:shadow-md transition-all group">
+                          <div className="space-y-1">
+                            <p className="font-black text-zinc-900">{g.name}</p>
+                            <p className="text-[9px] text-zinc-400 font-bold uppercase tracking-widest">
+                              {Number(g.latitude).toFixed(6)}, {Number(g.longitude).toFixed(6)} • {g.radius}m
+                            </p>
+                          </div>
+                          <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-blue-500 border border-zinc-100 group-hover:bg-blue-600 group-hover:text-white transition-all">
+                            <MapPin className="w-5 h-5" />
+                          </div>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
               </div>
@@ -1838,6 +1912,64 @@ export default function App() {
                   {loading ? "Menyimpan..." : "Simpan User"}
                 </button>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Journal Camera Modal */}
+      <AnimatePresence>
+        {showJournalCamera && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-zinc-900/90 backdrop-blur-md"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-lg bg-white rounded-[40px] shadow-2xl overflow-hidden"
+            >
+              <div className="p-8 space-y-6">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-2xl font-black text-zinc-900">Ambil Foto Jurnal</h3>
+                  <button 
+                    onClick={() => {
+                      const stream = journalVideoRef.current?.srcObject as MediaStream;
+                      if (stream) stream.getTracks().forEach(track => track.stop());
+                      setShowJournalCamera(false);
+                    }}
+                    className="p-2 hover:bg-zinc-50 rounded-full"
+                  >
+                    <X className="w-6 h-6 text-zinc-400" />
+                  </button>
+                </div>
+                
+                <div className="aspect-[3/4] bg-zinc-900 rounded-[32px] overflow-hidden relative shadow-inner">
+                  <video 
+                    ref={journalVideoRef} 
+                    autoPlay 
+                    playsInline 
+                    className="w-full h-full object-cover" 
+                  />
+                  <div className="absolute inset-0 border-[16px] border-white/10 pointer-events-none"></div>
+                </div>
+
+                <div className="flex flex-col gap-4">
+                  <button 
+                    onClick={takeJournalPhoto}
+                    className="w-full bg-blue-600 text-white font-black py-5 rounded-2xl shadow-xl shadow-blue-200 flex items-center justify-center gap-3 active:scale-[0.98] transition-all"
+                  >
+                    <Camera className="w-6 h-6" /> AMBIL FOTO
+                  </button>
+                  <p className="text-center text-[10px] font-black text-zinc-400 uppercase tracking-widest">
+                    Pastikan foto kegiatan terlihat jelas
+                  </p>
+                </div>
+              </div>
             </motion.div>
           </div>
         )}

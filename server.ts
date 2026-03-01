@@ -238,6 +238,8 @@ async function startServer() {
 
   app.post("/api/admin/geolocations", async (req, res) => {
     const { name, latitude, longitude, radius } = req.body;
+    // Delete all existing geolocations to ensure only one exists
+    await db.execute("DELETE FROM geolocations");
     await db.execute("INSERT INTO geolocations (name, latitude, longitude, radius) VALUES (?, ?, ?, ?)", [name, latitude, longitude, radius]);
     res.json({ success: true });
   });
