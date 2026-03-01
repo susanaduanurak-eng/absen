@@ -41,19 +41,16 @@ L.Icon.Default.mergeOptions({
 function MapUpdater({ center }: { center: [number, number] }) {
   const map = useMap();
   useEffect(() => {
-    if (typeof center[0] === 'number' && typeof center[1] === 'number' && !isNaN(center[0]) && !isNaN(center[1])) {
-      // Use flyTo with very short duration for a smooth but fast update
+    if (Array.isArray(center) && center.length === 2 && typeof center[0] === 'number' && typeof center[1] === 'number' && !isNaN(center[0]) && !isNaN(center[1])) {
       map.flyTo(center, map.getZoom(), { animate: true, duration: 0.3 });
     }
   }, [center[0], center[1], map]);
   return null;
 }
 
-const RealtimeMap = React.memo(({ lat, lng, zoom = 16, children, showLiveLabel = true, interactive = true }: { lat: number, lng: number, zoom?: number, children?: React.ReactNode, showLiveLabel?: boolean, interactive?: boolean }) => {
-  const center: [number, number] = useMemo(() => [lat, lng], [lat, lng]);
-  
+const RealtimeMap = React.memo(({ center, zoom = 16, children, showLiveLabel = true, interactive = true }: { center: [number, number], zoom?: number, children?: React.ReactNode, showLiveLabel?: boolean, interactive?: boolean }) => {
   // Safety check to prevent crash if coordinates are invalid
-  if (typeof lat !== 'number' || typeof lng !== 'number' || isNaN(lat) || isNaN(lng)) {
+  if (!Array.isArray(center) || center.length !== 2 || typeof center[0] !== 'number' || typeof center[1] !== 'number' || isNaN(center[0]) || isNaN(center[1])) {
     return (
       <div className="w-full h-full flex items-center justify-center bg-zinc-50 text-zinc-400 text-[10px] font-bold uppercase tracking-widest">
         Lokasi tidak valid
@@ -1065,8 +1062,8 @@ export default function App() {
 
                   {location && (
                     <div className="w-full h-[250px] rounded-3xl overflow-hidden border border-zinc-100 shadow-inner">
-                      <RealtimeMap lat={location.lat} lng={location.lng}>
-                        {adminGeos.map(geo => (
+                      <RealtimeMap center={[location.lat, location.lng]}>
+                        {(adminGeos || []).map(geo => (
                           <Circle 
                             key={geo.id}
                             center={[geo.latitude, geo.longitude]}
@@ -1211,7 +1208,7 @@ export default function App() {
                 </div>
                 {location ? (
                   <div className="w-full h-[200px] rounded-3xl overflow-hidden border border-zinc-100 shadow-inner">
-                    <RealtimeMap lat={location.lat} lng={location.lng} zoom={15} />
+                    <RealtimeMap center={[location.lat, location.lng]} zoom={15} />
                   </div>
                 ) : (
                   <div className="w-full h-[200px] bg-zinc-50 rounded-3xl border border-zinc-100 flex items-center justify-center">
@@ -1764,8 +1761,7 @@ export default function App() {
 
                     <div className="lg:col-span-2 h-[450px] rounded-[32px] overflow-hidden border border-zinc-100 shadow-inner">
                       <RealtimeMap 
-                        lat={adminGeos.length > 0 ? Number(adminGeos[0].latitude) : -6.2000} 
-                        lng={adminGeos.length > 0 ? Number(adminGeos[0].longitude) : 106.8166} 
+                        center={adminGeos && adminGeos.length > 0 ? [Number(adminGeos[0].latitude), Number(adminGeos[0].longitude)] : [-6.2000, 106.8166]} 
                         zoom={15}
                         showLiveLabel={false}
                       >
