@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Clock, 
   MapPin, 
@@ -41,23 +41,14 @@ L.Icon.Default.mergeOptions({
 function MapUpdater({ center }: { center: [number, number] }) {
   const map = useMap();
   useEffect(() => {
-    if (Array.isArray(center) && center.length === 2 && typeof center[0] === 'number' && typeof center[1] === 'number' && !isNaN(center[0]) && !isNaN(center[1])) {
-      map.flyTo(center, map.getZoom(), { animate: true, duration: 0.3 });
+    if (center[0] !== 0 && center[1] !== 0) {
+      map.flyTo(center, map.getZoom(), { animate: true, duration: 1 });
     }
-  }, [center[0], center[1], map]);
+  }, [center, map]);
   return null;
 }
 
 const RealtimeMap = React.memo(({ center, zoom = 16, children, showLiveLabel = true, interactive = true }: { center: [number, number], zoom?: number, children?: React.ReactNode, showLiveLabel?: boolean, interactive?: boolean }) => {
-  // Safety check to prevent crash if coordinates are invalid
-  if (!Array.isArray(center) || center.length !== 2 || typeof center[0] !== 'number' || typeof center[1] !== 'number' || isNaN(center[0]) || isNaN(center[1])) {
-    return (
-      <div className="w-full h-full flex items-center justify-center bg-zinc-50 text-zinc-400 text-[10px] font-bold uppercase tracking-widest">
-        Lokasi tidak valid
-      </div>
-    );
-  }
-
   return (
     <div className="w-full h-full relative z-10 bg-zinc-100">
       <MapContainer 
@@ -76,9 +67,9 @@ const RealtimeMap = React.memo(({ center, zoom = 16, children, showLiveLabel = t
         <TileLayer 
           url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
           attribution='&copy; OpenStreetMap'
-          updateWhenIdle={false}
+          updateWhenIdle={true}
           updateWhenZooming={false}
-          keepBuffer={4}
+          keepBuffer={2}
         />
         <Marker position={center} />
         {children}
@@ -1063,7 +1054,7 @@ export default function App() {
                   {location && (
                     <div className="w-full h-[250px] rounded-3xl overflow-hidden border border-zinc-100 shadow-inner">
                       <RealtimeMap center={[location.lat, location.lng]}>
-                        {(adminGeos || []).map(geo => (
+                        {adminGeos.map(geo => (
                           <Circle 
                             key={geo.id}
                             center={[geo.latitude, geo.longitude]}
@@ -1761,7 +1752,7 @@ export default function App() {
 
                     <div className="lg:col-span-2 h-[450px] rounded-[32px] overflow-hidden border border-zinc-100 shadow-inner">
                       <RealtimeMap 
-                        center={adminGeos && adminGeos.length > 0 ? [Number(adminGeos[0].latitude), Number(adminGeos[0].longitude)] : [-6.2000, 106.8166]} 
+                        center={adminGeos.length > 0 ? [Number(adminGeos[0].latitude), Number(adminGeos[0].longitude)] : [-6.2000, 106.8166]} 
                         zoom={15}
                         showLiveLabel={false}
                       >
