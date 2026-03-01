@@ -172,6 +172,7 @@ export default function App() {
   const [journalContent, setJournalContent] = useState('');
   const [journalSelfie, setJournalSelfie] = useState<string | null>(null);
   const [showJournalCamera, setShowJournalCamera] = useState(false);
+  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
   const journalVideoRef = useRef<HTMLVideoElement>(null);
 
   // Permission form state
@@ -483,10 +484,16 @@ export default function App() {
   };
 
   const startJournalCamera = async () => {
+    // Stop existing stream
+    if (journalVideoRef.current?.srcObject) {
+      const stream = journalVideoRef.current.srcObject as MediaStream;
+      stream.getTracks().forEach(track => track.stop());
+    }
+
     setShowJournalCamera(true);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'environment' } 
+        video: { facingMode: facingMode } 
       });
       if (journalVideoRef.current) {
         journalVideoRef.current.srcObject = stream;
@@ -497,6 +504,28 @@ export default function App() {
       setShowJournalCamera(false);
     }
   };
+
+  useEffect(() => {
+    if (showJournalCamera) {
+      startJournalCamera();
+    } else {
+      if (journalVideoRef.current?.srcObject) {
+        const stream = journalVideoRef.current.srcObject as MediaStream;
+        stream.getTracks().forEach(track => track.stop());
+      }
+    }
+  }, [showJournalCamera, facingMode]);
+
+  useEffect(() => {
+    if (attendanceStep === 3 && !capturedSelfie) {
+      startCamera();
+    } else {
+      if (videoRef.current?.srcObject) {
+        const stream = videoRef.current.srcObject as MediaStream;
+        stream.getTracks().forEach(track => track.stop());
+      }
+    }
+  }, [attendanceStep, capturedSelfie, facingMode]);
 
   const takeJournalPhoto = () => {
     if (journalVideoRef.current) {
@@ -622,10 +651,16 @@ export default function App() {
   };
 
   const startCamera = async () => {
+    // Stop existing stream
+    if (videoRef.current?.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      stream.getTracks().forEach(track => track.stop());
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: { 
-          facingMode: 'user',
+          facingMode: facingMode,
           aspectRatio: { ideal: 3/4 }
         } 
       });
@@ -1045,8 +1080,21 @@ export default function App() {
                   {!capturedSelfie ? (
                     <>
                       <div className="relative w-full aspect-[3/4] bg-zinc-900 rounded-3xl overflow-hidden shadow-2xl">
-                        <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover scale-x-[-1]" />
+                        <video 
+                          ref={videoRef} 
+                          autoPlay 
+                          playsInline 
+                          className={`w-full h-full object-cover ${facingMode === 'user' ? 'scale-x-[-1]' : ''}`} 
+                        />
                         <div className="absolute inset-0 border-2 border-white/20 pointer-events-none"></div>
+                        <div className="absolute top-4 right-4">
+                          <button 
+                            onClick={() => setFacingMode(prev => prev === 'user' ? 'environment' : 'user')}
+                            className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white border border-white/30 hover:bg-white/40 transition-all"
+                          >
+                            <RefreshCw className="w-6 h-6" />
+                          </button>
+                        </div>
                         <div className="absolute bottom-4 left-4 right-4 flex justify-between items-end">
                           <div className="text-left text-white/80 text-[10px] font-bold uppercase tracking-widest">
                             <p>{new Date().toLocaleDateString('id-ID')}</p>
@@ -1953,9 +2001,17 @@ export default function App() {
                     ref={journalVideoRef} 
                     autoPlay 
                     playsInline 
-                    className="w-full h-full object-cover" 
+                    className={`w-full h-full object-cover ${facingMode === 'user' ? 'scale-x-[-1]' : ''}`} 
                   />
                   <div className="absolute inset-0 border-[16px] border-white/10 pointer-events-none"></div>
+                  <div className="absolute top-4 right-4">
+                    <button 
+                      onClick={() => setFacingMode(prev => prev === 'user' ? 'environment' : 'user')}
+                      className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white border border-white/30 hover:bg-white/40 transition-all"
+                    >
+                      <RefreshCw className="w-6 h-6" />
+                    </button>
+                  </div>
                 </div>
 
                 <div className="flex flex-col gap-4">
