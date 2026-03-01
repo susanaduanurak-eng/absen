@@ -172,7 +172,6 @@ export default function App() {
   const [journalContent, setJournalContent] = useState('');
   const [journalSelfie, setJournalSelfie] = useState<string | null>(null);
   const [showJournalCamera, setShowJournalCamera] = useState(false);
-  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
   const journalVideoRef = useRef<HTMLVideoElement>(null);
 
   // Permission form state
@@ -497,14 +496,13 @@ export default function App() {
   const startJournalCamera = async () => {
     stopStream(journalVideoRef.current);
     
-    // Small delay to let the browser release the hardware
     await new Promise(resolve => setTimeout(resolve, 100));
 
     setShowJournalCamera(true);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: { 
-          facingMode: facingMode,
+          facingMode: 'user',
           width: { ideal: 1280 },
           height: { ideal: 720 }
         } 
@@ -514,7 +512,7 @@ export default function App() {
       }
     } catch (err) {
       console.error("Journal Camera error:", err);
-      setMessage({ text: "Gagal mengakses kamera jurnal. Pastikan izin kamera diberikan.", type: 'error' });
+      setMessage({ text: "Gagal mengakses kamera. Pastikan izin kamera diberikan.", type: 'error' });
       setShowJournalCamera(false);
     }
   };
@@ -526,7 +524,7 @@ export default function App() {
       stopStream(journalVideoRef.current);
     }
     return () => stopStream(journalVideoRef.current);
-  }, [showJournalCamera, facingMode]);
+  }, [showJournalCamera]);
 
   useEffect(() => {
     if (attendanceStep === 3 && !capturedSelfie) {
@@ -535,7 +533,7 @@ export default function App() {
       stopStream(videoRef.current);
     }
     return () => stopStream(videoRef.current);
-  }, [attendanceStep, capturedSelfie, facingMode]);
+  }, [attendanceStep, capturedSelfie]);
 
   const takeJournalPhoto = () => {
     if (journalVideoRef.current) {
@@ -663,13 +661,12 @@ export default function App() {
   const startCamera = async () => {
     stopStream(videoRef.current);
     
-    // Small delay to let the browser release the hardware
     await new Promise(resolve => setTimeout(resolve, 100));
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: { 
-          facingMode: facingMode,
+          facingMode: 'user',
           aspectRatio: { ideal: 3/4 },
           width: { ideal: 720 },
           height: { ideal: 960 }
@@ -680,7 +677,7 @@ export default function App() {
       }
     } catch (err) {
       console.error("Attendance Camera error:", err);
-      setMessage({ text: "Gagal mengakses kamera absen. Pastikan izin kamera diberikan.", type: 'error' });
+      setMessage({ text: "Gagal mengakses kamera. Pastikan izin kamera diberikan.", type: 'error' });
     }
   };
 
@@ -1095,17 +1092,9 @@ export default function App() {
                           ref={videoRef} 
                           autoPlay 
                           playsInline 
-                          className={`w-full h-full object-cover ${facingMode === 'user' ? 'scale-x-[-1]' : ''}`} 
+                          className="w-full h-full object-cover scale-x-[-1]" 
                         />
                         <div className="absolute inset-0 border-2 border-white/20 pointer-events-none"></div>
-                        <div className="absolute top-4 right-4">
-                          <button 
-                            onClick={() => setFacingMode(prev => prev === 'user' ? 'environment' : 'user')}
-                            className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white border border-white/30 hover:bg-white/40 transition-all"
-                          >
-                            <RefreshCw className="w-6 h-6" />
-                          </button>
-                        </div>
                         <div className="absolute bottom-4 left-4 right-4 flex justify-between items-end">
                           <div className="text-left text-white/80 text-[10px] font-bold uppercase tracking-widest">
                             <p>{new Date().toLocaleDateString('id-ID')}</p>
@@ -2012,17 +2001,9 @@ export default function App() {
                     ref={journalVideoRef} 
                     autoPlay 
                     playsInline 
-                    className={`w-full h-full object-cover ${facingMode === 'user' ? 'scale-x-[-1]' : ''}`} 
+                    className="w-full h-full object-cover scale-x-[-1]" 
                   />
                   <div className="absolute inset-0 border-[16px] border-white/10 pointer-events-none"></div>
-                  <div className="absolute top-4 right-4">
-                    <button 
-                      onClick={() => setFacingMode(prev => prev === 'user' ? 'environment' : 'user')}
-                      className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white border border-white/30 hover:bg-white/40 transition-all"
-                    >
-                      <RefreshCw className="w-6 h-6" />
-                    </button>
-                  </div>
                 </div>
 
                 <div className="flex flex-col gap-4">
