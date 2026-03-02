@@ -95,7 +95,7 @@ async function setupSQLite() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER,
       type TEXT,
-      timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+      timestamp DATETIME DEFAULT (datetime('now', '+8 hours')),
       latitude REAL,
       longitude REAL,
       address TEXT,
@@ -107,11 +107,12 @@ async function setupSQLite() {
       user_id INTEGER,
       class_id INTEGER,
       subject_id INTEGER,
+      teaching_hours INTEGER,
       content TEXT,
       selfie TEXT,
       latitude REAL,
       longitude REAL,
-      timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+      timestamp DATETIME DEFAULT (datetime('now', '+8 hours'))
     );
 
     CREATE TABLE IF NOT EXISTS permissions (
@@ -121,9 +122,14 @@ async function setupSQLite() {
       reason TEXT,
       file_url TEXT,
       status TEXT DEFAULT 'pending',
-      timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+      timestamp DATETIME DEFAULT (datetime('now', '+8 hours'))
     );
   `);
+
+  // Add teaching_hours if not exists (for existing DB)
+  try {
+    await sqliteDb.exec("ALTER TABLE journals ADD COLUMN teaching_hours INTEGER");
+  } catch (e) {}
 
   // Seed default data for SQLite
   const admin = await sqliteDb.get("SELECT * FROM users WHERE username = ?", "admin");
@@ -298,12 +304,22 @@ async function startServer() {
     res.json({ success: true });
   });
 
+  app.get("/api/classes", async (req, res) => {
+    const [rows] = await db.execute("SELECT * FROM classes");
+    res.json(rows);
+  });
+
+  app.get("/api/subjects", async (req, res) => {
+    const [rows] = await db.execute("SELECT * FROM subjects");
+    res.json(rows);
+  });
+
   app.post("/api/journals", async (req, res) => {
-    const { userId, classId, subjectId, content, selfie, latitude, longitude } = req.body;
+    const { userId, classId, subjectId, teachingHours, content, selfie, latitude, longitude } = req.body;
     await db.execute(`
-      INSERT INTO journals (user_id, class_id, subject_id, content, selfie, latitude, longitude)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `, [userId, classId, subjectId, content, selfie, latitude, longitude]);
+      INSERT INTO journals (user_id, class_id, subject_id, teaching_hours, content, selfie, latitude, longitude)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `, [userId, classId, subjectId, teachingHours, content, selfie, latitude, longitude]);
     res.json({ success: true });
   });
 

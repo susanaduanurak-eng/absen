@@ -28,6 +28,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { MapContainer, TileLayer, Marker, Circle, useMap, Popup } from 'react-leaflet';
 import L from 'leaflet';
+import * as XLSX from 'xlsx';
 
 // Fix for default marker icons in react-leaflet
 // @ts-ignore
@@ -169,6 +170,7 @@ export default function App() {
   // Journal form state
   const [journalClass, setJournalClass] = useState('');
   const [journalSubject, setJournalSubject] = useState('');
+  const [journalTeachingHours, setJournalTeachingHours] = useState('1');
   const [journalContent, setJournalContent] = useState('');
   const [journalSelfie, setJournalSelfie] = useState<string | null>(null);
   const [showJournalCamera, setShowJournalCamera] = useState(false);
@@ -195,8 +197,22 @@ export default function App() {
       fetchGeolocations();
       fetchUserHistory();
       fetchStats();
+      fetchPublicData();
     }
   }, [user]);
+
+  const fetchPublicData = async () => {
+    try {
+      const [c, s] = await Promise.all([
+        fetch('/api/classes').then(r => r.json()),
+        fetch('/api/subjects').then(r => r.json()),
+      ]);
+      setAdminClasses(Array.isArray(c) ? c : []);
+      setAdminSubjects(Array.isArray(s) ? s : []);
+    } catch (err) {
+      console.error("Failed to fetch public data", err);
+    }
+  };
 
   const fetchStats = async () => {
     try {
@@ -268,6 +284,7 @@ export default function App() {
           userId: user.id,
           classId: journalClass,
           subjectId: journalSubject,
+          teachingHours: parseInt(journalTeachingHours),
           content: journalContent,
           selfie: journalSelfie,
           latitude: location?.lat,
@@ -480,6 +497,26 @@ export default function App() {
     } catch (err) {
       setMessage({ text: "Gagal menambahkan geolokasi", type: 'error' });
     }
+  };
+
+  const exportToExcel = () => {
+    if (adminAttendance.length === 0) {
+      setMessage({ text: "Tidak ada data untuk diekspor", type: 'error' });
+      return;
+    }
+
+    const data = adminAttendance.map(a => ({
+      'Nama Pegawai': a.user_name,
+      'Tipe': a.type === 'in' ? 'Masuk' : 'Pulang',
+      'Waktu': new Date(a.timestamp).toLocaleString('id-ID'),
+      'Alamat/Koordinat': a.address,
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Laporan Absensi");
+    XLSX.writeFile(wb, `Laporan_Absensi_${new Date().toISOString().split('T')[0]}.xlsx`);
+    setMessage({ text: "Data berhasil diekspor ke Excel!", type: 'success' });
   };
 
   const stopStream = (videoElement: HTMLVideoElement | null) => {
@@ -844,7 +881,7 @@ export default function App() {
                   {currentTime.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long' })}
                 </p>
                 <div className="mt-4">
-                  {userHistory.some(h => new Date(h.timestamp).toDateString() === new Date().toDateString() && h.type === 'in') ? (
+                  {userHistory.some(h => h.timestamp.split(' ')[0] === new Date(new Date().getTime() + 8 * 3600000).toISOString().split('T')[0] && h.type === 'in') ? (
                     <span className="px-4 py-1.5 bg-emerald-50 text-emerald-500 text-[10px] font-black uppercase tracking-widest rounded-full border border-emerald-100">
                       Sudah Absen Masuk
                     </span>
@@ -1179,6 +1216,16 @@ export default function App() {
                 </div>
               </div>
               <div className="space-y-2">
+                <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest ml-1">Jam Mengajar (1-8)</label>
+                <select 
+                  value={journalTeachingHours}
+                  onChange={(e) => setJournalTeachingHours(e.target.value)}
+                  className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl py-4 px-4 font-bold text-zinc-700 outline-none focus:ring-2 focus:ring-blue-500/20"
+                >
+                  {[1,2,3,4,5,6,7,8].map(h => <option key={h} value={h.toString()}>Jam ke-{h}</option>)}
+                </select>
+              </div>
+              <div className="space-y-2">
                 <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest ml-1">Isi Jurnal / Materi</label>
                 <textarea 
                   value={journalContent}
@@ -1316,7 +1363,10 @@ export default function App() {
                 <p className="text-zinc-400 font-bold uppercase tracking-widest text-[10px] mt-1">Panel Administrator</p>
               </div>
               <div className="flex gap-3">
-                <button className="bg-emerald-500 text-white px-6 py-3 rounded-2xl font-bold text-sm flex items-center gap-2 shadow-lg shadow-emerald-100">
+                <button 
+                  onClick={exportToExcel}
+                  className="bg-emerald-500 text-white px-6 py-3 rounded-2xl font-bold text-sm flex items-center gap-2 shadow-lg shadow-emerald-100 hover:bg-emerald-600 transition-colors"
+                >
                   <Download className="w-4 h-4" /> Export Excel
                 </button>
                 <button 
@@ -1471,6 +1521,7 @@ export default function App() {
                       <th className="px-8 py-5 text-[10px] font-black text-zinc-400 uppercase tracking-widest">Tipe</th>
                       <th className="px-8 py-5 text-[10px] font-black text-zinc-400 uppercase tracking-widest">Waktu</th>
                       <th className="px-8 py-5 text-[10px] font-black text-zinc-400 uppercase tracking-widest">Lokasi</th>
+                      <th className="px-8 py-5 text-[10px] font-black text-zinc-400 uppercase tracking-widest">Foto</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-50">
@@ -1488,6 +1539,21 @@ export default function App() {
                           {new Date(a.timestamp).toLocaleString('id-ID')}
                         </td>
                         <td className="px-8 py-5 text-xs text-zinc-400 truncate max-w-[200px]">{a.address}</td>
+                        <td className="px-8 py-5">
+                          {a.selfie ? (
+                            <button 
+                              onClick={() => {
+                                const win = window.open("");
+                                win?.document.write(`<img src="${a.selfie}" style="max-width:100%">`);
+                              }}
+                              className="text-blue-600 font-bold text-xs hover:underline"
+                            >
+                              Lihat Foto
+                            </button>
+                          ) : (
+                            <span className="text-zinc-300 text-xs">Tidak ada</span>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -1513,7 +1579,7 @@ export default function App() {
                         <div>
                           <h4 className="text-xl font-black text-zinc-900">Materi: {j.subject_name}</h4>
                           <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mt-1">
-                            Guru: {j.user_name} | Kelas: {j.class_name}
+                            Guru: {j.user_name} | Kelas: {j.class_name} | Jam ke-{j.teaching_hours || '?'}
                           </p>
                         </div>
                         <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
