@@ -128,7 +128,7 @@ async function setupSQLite() {
 
   // Add teaching_hours if not exists (for existing DB)
   try {
-    await sqliteDb.exec("ALTER TABLE journals ADD COLUMN teaching_hours INTEGER");
+    // Migrations moved to runMigrations()
   } catch (e) {}
 
   // Seed default data for SQLite
@@ -152,8 +152,30 @@ async function setupSQLite() {
     console.error("Please configure MySQL in .env (DB_HOST, etc.) for Hostinger production.");
   }
 }
+async function runMigrations() {
+  try {
+    if (isMySQL) {
+      // Check if teaching_hours exists in journals
+      const [columns]: any = await db.execute("SHOW COLUMNS FROM journals LIKE 'teaching_hours'");
+      if (columns.length === 0) {
+        await db.execute("ALTER TABLE journals ADD COLUMN teaching_hours INT");
+      }
+    } else {
+      const sqliteDb = await open({ filename: "attendance.db", driver: sqlite3.Database });
+      try {
+        await sqliteDb.exec("ALTER TABLE journals ADD COLUMN teaching_hours INTEGER");
+      } catch (e) {
+        // Ignore if column already exists
+      }
+    }
+  } catch (err) {
+    console.error("Migration error:", err);
+  }
+}
+
 async function startServer() {
   await initDB();
+  await runMigrations();
   
   const app = express();
   const PORT = 3000;

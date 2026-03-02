@@ -123,6 +123,28 @@ interface Stats {
 
 type Tab = 'beranda' | 'absensi' | 'jurnal' | 'izin' | 'admin';
 
+const formatDate = (date: any) => {
+  if (!date) return "N/A";
+  try {
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return "Invalid Date";
+    return d.toISOString().split('T')[0];
+  } catch (e) {
+    return "Invalid Date";
+  }
+};
+
+const formatTime = (date: any) => {
+  if (!date) return "N/A";
+  try {
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return "Invalid Time";
+    return d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+  } catch (e) {
+    return "Invalid Time";
+  }
+};
+
 export default function App() {
   const [user, setUser] = useState<UserData | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('beranda');
@@ -881,7 +903,11 @@ export default function App() {
                   {currentTime.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long' })}
                 </p>
                 <div className="mt-4">
-                  {userHistory.some(h => h.timestamp.split(' ')[0] === new Date(new Date().getTime() + 8 * 3600000).toISOString().split('T')[0] && h.type === 'in') ? (
+                  {userHistory.some(h => {
+                    const recordDate = formatDate(h.timestamp);
+                    const today = new Date(new Date().getTime() + 8 * 3600000).toISOString().split('T')[0];
+                    return recordDate === today && h.type === 'in';
+                  }) ? (
                     <span className="px-4 py-1.5 bg-emerald-50 text-emerald-500 text-[10px] font-black uppercase tracking-widest rounded-full border border-emerald-100">
                       Sudah Absen Masuk
                     </span>
@@ -988,9 +1014,9 @@ export default function App() {
                       </div>
                       <div className="text-right">
                         <p className="text-lg font-black text-zinc-900">
-                          {new Date(record.timestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                          {formatTime(record.timestamp)}
                         </p>
-                        <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">WIB</p>
+                        <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">WITA</p>
                       </div>
                     </div>
                   ))
@@ -1536,7 +1562,7 @@ export default function App() {
                           </span>
                         </td>
                         <td className="px-8 py-5 text-sm text-zinc-500 font-medium">
-                          {new Date(a.timestamp).toLocaleString('id-ID')}
+                          {formatDate(a.timestamp)} {formatTime(a.timestamp)}
                         </td>
                         <td className="px-8 py-5 text-xs text-zinc-400 truncate max-w-[200px]">{a.address}</td>
                         <td className="px-8 py-5">
@@ -1583,7 +1609,7 @@ export default function App() {
                           </p>
                         </div>
                         <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
-                          {new Date(j.timestamp).toLocaleDateString('id-ID')}
+                          {formatDate(j.timestamp)}
                         </span>
                       </div>
                       <p className="text-zinc-600 text-sm leading-relaxed">{j.content}</p>
