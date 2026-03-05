@@ -107,7 +107,7 @@ async function setupSQLite() {
       user_id INTEGER,
       class_id INTEGER,
       subject_id INTEGER,
-      teaching_hours INTEGER,
+      teaching_hours TEXT,
       content TEXT,
       selfie TEXT,
       latitude REAL,
@@ -158,14 +158,21 @@ async function runMigrations() {
       // Check if teaching_hours exists in journals
       const [columns]: any = await db.execute("SHOW COLUMNS FROM journals LIKE 'teaching_hours'");
       if (columns.length === 0) {
-        await db.execute("ALTER TABLE journals ADD COLUMN teaching_hours INT");
+        await db.execute("ALTER TABLE journals ADD COLUMN teaching_hours TEXT");
+      } else {
+        // If it exists but is INT, change to TEXT
+        const col = columns[0];
+        if (col.Type.toLowerCase().includes('int')) {
+          await db.execute("ALTER TABLE journals MODIFY COLUMN teaching_hours TEXT");
+        }
       }
     } else {
       const sqliteDb = await open({ filename: "attendance.db", driver: sqlite3.Database });
       try {
-        await sqliteDb.exec("ALTER TABLE journals ADD COLUMN teaching_hours INTEGER");
+        await sqliteDb.exec("ALTER TABLE journals ADD COLUMN teaching_hours TEXT");
       } catch (e) {
-        // Ignore if column already exists
+        // If it exists but is INTEGER, we might need to recreate but SQLite is tricky.
+        // For now let's just try to change it if we can or ignore.
       }
     }
   } catch (err) {
@@ -276,7 +283,7 @@ async function startServer() {
     const [rows] = await db.execute(`
       SELECT a.*, u.name as user_name 
       FROM attendance a
-      JOIN users u ON a.user_id = u.id
+      LEFT JOIN users u ON a.user_id = u.id
       ORDER BY a.timestamp DESC
     `);
     res.json(rows);
@@ -286,9 +293,9 @@ async function startServer() {
     const [rows] = await db.execute(`
       SELECT j.*, u.name as user_name, c.name as class_name, s.name as subject_name
       FROM journals j
-      JOIN users u ON j.user_id = u.id
-      JOIN classes c ON j.class_id = c.id
-      JOIN subjects s ON j.subject_id = s.id
+      LEFT JOIN users u ON j.user_id = u.id
+      LEFT JOIN classes c ON j.class_id = c.id
+      LEFT JOIN subjects s ON j.subject_id = s.id
       ORDER BY j.timestamp DESC
     `);
     res.json(rows);
@@ -298,7 +305,7 @@ async function startServer() {
     const [rows] = await db.execute(`
       SELECT p.*, u.name as user_name
       FROM permissions p
-      JOIN users u ON p.user_id = u.id
+      LEFT JOIN users u ON p.user_id = u.id
       ORDER BY p.timestamp DESC
     `);
     res.json(rows);

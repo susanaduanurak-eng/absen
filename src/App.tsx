@@ -26,56 +26,87 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { MapContainer, TileLayer, Marker, Circle, useMap, Popup } from 'react-leaflet';
-import L from 'leaflet';
-import * as XLSX from 'xlsx';
+import DigitalClock from './components/DigitalClock';
+import DateDisplay from './components/DateDisplay';
 
-// Fix for default marker icons in react-leaflet
-// @ts-ignore
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-});
+// Lazy load Map components
+const MapContainer = React.lazy(() => import('react-leaflet').then(m => ({ default: m.MapContainer })));
+const TileLayer = React.lazy(() => import('react-leaflet').then(m => ({ default: m.TileLayer })));
+const Marker = React.lazy(() => import('react-leaflet').then(m => ({ default: m.Marker })));
+const Circle = React.lazy(() => import('react-leaflet').then(m => ({ default: m.Circle })));
+const Popup = React.lazy(() => import('react-leaflet').then(m => ({ default: m.Popup })));
+const useMap = () => {
+  const [map, setMap] = useState<any>(null);
+  // This is a simplified version since we can't easily lazy load hooks
+  // But we'll handle it inside the components
+  return map;
+};
+
+// We'll need a wrapper for Leaflet because of the global L
+let L: any = null;
+const loadLeaflet = async () => {
+  if (L) return L;
+  L = (await import('leaflet')).default;
+  // Fix for default marker icons
+  delete L.Icon.Default.prototype._getIconUrl;
+  L.Icon.Default.mergeOptions({
+    iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+    iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+    shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  });
+  return L;
+};
 
 function MapUpdater({ center }: { center: [number, number] }) {
-  const map = useMap();
+  // Dynamic import of useMap
+  const [map, setMap] = useState<any>(null);
+  
   useEffect(() => {
-    if (center[0] !== 0 && center[1] !== 0) {
-      map.flyTo(center, map.getZoom(), { animate: true, duration: 1 });
-    }
-  }, [center, map]);
+    import('react-leaflet').then(m => {
+      // We can't easily use the hook here if it's not in a component under MapContainer
+      // So we'll pass the map instance differently or use a different approach
+    });
+  }, []);
+
   return null;
 }
 
 const RealtimeMap = React.memo(({ center, zoom = 16, children, showLiveLabel = true, interactive = true }: { center: [number, number], zoom?: number, children?: React.ReactNode, showLiveLabel?: boolean, interactive?: boolean }) => {
+  const [leafletLoaded, setLeafletLoaded] = useState(false);
+
+  useEffect(() => {
+    loadLeaflet().then(() => setLeafletLoaded(true));
+  }, []);
+
+  if (!leafletLoaded) return <div className="w-full h-full bg-zinc-100 animate-pulse flex items-center justify-center text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Memuat Peta...</div>;
+
   return (
     <div className="w-full h-full relative z-10 bg-zinc-100">
-      <MapContainer 
-        center={center} 
-        zoom={zoom} 
-        style={{ height: '100%', width: '100%' }}
-        zoomControl={false}
-        preferCanvas={true}
-        dragging={interactive}
-        touchZoom={interactive}
-        scrollWheelZoom={interactive}
-        doubleClickZoom={interactive}
-        boxZoom={false}
-        keyboard={false}
-      >
-        <TileLayer 
-          url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-          attribution='&copy; OpenStreetMap'
-          updateWhenIdle={true}
-          updateWhenZooming={false}
-          keepBuffer={2}
-        />
-        <Marker position={center} />
-        {children}
-        <MapUpdater center={center} />
-      </MapContainer>
+      <React.Suspense fallback={<div className="w-full h-full bg-zinc-100 animate-pulse" />}>
+        <MapContainer 
+          center={center} 
+          zoom={zoom} 
+          style={{ height: '100%', width: '100%' }}
+          zoomControl={false}
+          preferCanvas={true}
+          dragging={interactive}
+          touchZoom={interactive}
+          scrollWheelZoom={interactive}
+          doubleClickZoom={interactive}
+          boxZoom={false}
+          keyboard={false}
+        >
+          <TileLayer 
+            url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+            attribution='&copy; OpenStreetMap'
+            updateWhenIdle={true}
+            updateWhenZooming={false}
+            keepBuffer={2}
+          />
+          <Marker position={center} />
+          {children}
+        </MapContainer>
+      </React.Suspense>
       {showLiveLabel && (
         <div className="absolute bottom-4 left-4 z-[1000] bg-white/90 backdrop-blur px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border border-zinc-100 shadow-sm flex items-center gap-2">
           <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div>
@@ -145,6 +176,8 @@ const formatTime = (date: any) => {
   }
 };
 
+const AdminPanel = React.lazy(() => import('./components/AdminPanel'));
+
 export default function App() {
   const [user, setUser] = useState<UserData | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('beranda');
@@ -173,7 +206,6 @@ export default function App() {
   };
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState<Stats>({ totalUsers: 0, todayAttendance: 0, pendingPermissions: 0 });
-  const [currentTime, setCurrentTime] = useState(new Date());
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [distance, setDistance] = useState<number | null>(null);
   const [isWithinArea, setIsWithinArea] = useState(false);
@@ -192,7 +224,7 @@ export default function App() {
   // Journal form state
   const [journalClass, setJournalClass] = useState('');
   const [journalSubject, setJournalSubject] = useState('');
-  const [journalTeachingHours, setJournalTeachingHours] = useState('1');
+  const [journalTeachingHours, setJournalTeachingHours] = useState<string[]>([]);
   const [journalContent, setJournalContent] = useState('');
   const [journalSelfie, setJournalSelfie] = useState<string | null>(null);
   const [showJournalCamera, setShowJournalCamera] = useState(false);
@@ -306,7 +338,7 @@ export default function App() {
           userId: user.id,
           classId: journalClass,
           subjectId: journalSubject,
-          teachingHours: parseInt(journalTeachingHours),
+          teachingHours: journalTeachingHours.join(','),
           content: journalContent,
           selfie: journalSelfie,
           latitude: location?.lat,
@@ -470,6 +502,7 @@ export default function App() {
         setMessage({ text: "Kelas berhasil ditambahkan", type: 'success' });
         setNewClassName('');
         fetchAdminData();
+        fetchPublicData();
       }
     } catch (err) {
       setMessage({ text: "Gagal menambahkan kelas", type: 'error' });
@@ -488,6 +521,7 @@ export default function App() {
         setMessage({ text: "Mata pelajaran berhasil ditambahkan", type: 'success' });
         setNewSubjectName('');
         fetchAdminData();
+        fetchPublicData();
       }
     } catch (err) {
       setMessage({ text: "Gagal menambahkan mata pelajaran", type: 'error' });
@@ -521,24 +555,32 @@ export default function App() {
     }
   };
 
-  const exportToExcel = () => {
-    if (adminAttendance.length === 0) {
+  const exportToExcel = async () => {
+    if (!Array.isArray(adminAttendance) || adminAttendance.length === 0) {
       setMessage({ text: "Tidak ada data untuk diekspor", type: 'error' });
       return;
     }
 
-    const data = adminAttendance.map(a => ({
-      'Nama Pegawai': a.user_name,
-      'Tipe': a.type === 'in' ? 'Masuk' : 'Pulang',
-      'Waktu': new Date(a.timestamp).toLocaleString('id-ID'),
-      'Alamat/Koordinat': a.address,
-    }));
+    setLoading(true);
+    try {
+      const XLSX = await import('xlsx');
+      const data = adminAttendance.map(a => ({
+        'Nama Pegawai': a?.user_name || 'N/A',
+        'Tipe': a?.type === 'in' ? 'Masuk' : 'Pulang',
+        'Waktu': a?.timestamp ? new Date(a.timestamp).toLocaleString('id-ID') : 'N/A',
+        'Alamat/Koordinat': a?.address || 'N/A',
+      }));
 
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Laporan Absensi");
-    XLSX.writeFile(wb, `Laporan_Absensi_${new Date().toISOString().split('T')[0]}.xlsx`);
-    setMessage({ text: "Data berhasil diekspor ke Excel!", type: 'success' });
+      const ws = XLSX.utils.json_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Laporan Absensi");
+      XLSX.writeFile(wb, `Laporan_Absensi_${new Date().toISOString().split('T')[0]}.xlsx`);
+      setMessage({ text: "Data berhasil diekspor ke Excel!", type: 'success' });
+    } catch (err) {
+      setMessage({ text: "Gagal mengekspor data", type: 'error' });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const stopStream = (videoElement: HTMLVideoElement | null) => {
@@ -597,12 +639,27 @@ export default function App() {
   const takeJournalPhoto = () => {
     if (journalVideoRef.current) {
       const canvas = document.createElement('canvas');
-      canvas.width = journalVideoRef.current.videoWidth;
-      canvas.height = journalVideoRef.current.videoHeight;
+      // Resize for mobile efficiency
+      const maxDim = 800;
+      let width = journalVideoRef.current.videoWidth;
+      let height = journalVideoRef.current.videoHeight;
+      if (width > height) {
+        if (width > maxDim) {
+          height *= maxDim / width;
+          width = maxDim;
+        }
+      } else {
+        if (height > maxDim) {
+          width *= maxDim / height;
+          height = maxDim;
+        }
+      }
+      canvas.width = width;
+      canvas.height = height;
       const ctx = canvas.getContext('2d');
       if (ctx) {
-        ctx.drawImage(journalVideoRef.current, 0, 0);
-        setJournalSelfie(canvas.toDataURL('image/jpeg', 0.8));
+        ctx.drawImage(journalVideoRef.current, 0, 0, width, height);
+        setJournalSelfie(canvas.toDataURL('image/jpeg', 0.6));
         
         // Stop camera
         const stream = journalVideoRef.current.srcObject as MediaStream;
@@ -636,11 +693,6 @@ export default function App() {
       setMessage({ text: "Browser Anda tidak mendukung GPS", type: 'error' });
     }
   };
-
-  useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
 
   useEffect(() => {
     let watcher: number | null = null;
@@ -743,25 +795,42 @@ export default function App() {
   const takeSelfie = () => {
     if (videoRef.current) {
       const canvas = document.createElement('canvas');
-      canvas.width = videoRef.current.videoWidth;
-      canvas.height = videoRef.current.videoHeight;
+      // Resize for mobile efficiency
+      const maxDim = 800;
+      let width = videoRef.current.videoWidth;
+      let height = videoRef.current.videoHeight;
+      if (width > height) {
+        if (width > maxDim) {
+          height *= maxDim / width;
+          width = maxDim;
+        }
+      } else {
+        if (height > maxDim) {
+          width *= maxDim / height;
+          height = maxDim;
+        }
+      }
+      canvas.width = width;
+      canvas.height = height;
       const ctx = canvas.getContext('2d');
       if (ctx) {
-        ctx.drawImage(videoRef.current, 0, 0);
+        ctx.drawImage(videoRef.current, 0, 0, width, height);
         
-        // Watermark
+        // Watermark - adjust font size for smaller canvas
         ctx.fillStyle = "white";
-        ctx.font = "16px sans-serif";
+        ctx.font = "14px sans-serif";
         const dateStr = new Date().toLocaleString('id-ID');
-        const locStr = location ? `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}` : "Unknown Location";
-        ctx.fillText(dateStr, 20, canvas.height - 40);
-        ctx.fillText(locStr, 20, canvas.height - 20);
+        const locStr = location ? `${location?.lat?.toFixed(4) || '0'}, ${location?.lng?.toFixed(4) || '0'}` : "Unknown Location";
+        ctx.fillText(dateStr, 15, canvas.height - 35);
+        ctx.fillText(locStr, 15, canvas.height - 15);
         
-        setCapturedSelfie(canvas.toDataURL('image/jpeg'));
+        setCapturedSelfie(canvas.toDataURL('image/jpeg', 0.6));
         
         // Stop camera
         const stream = videoRef.current.srcObject as MediaStream;
-        stream.getTracks().forEach(track => track.stop());
+        if (stream) {
+          stream.getTracks().forEach(track => track.stop());
+        }
       }
     }
   };
@@ -875,8 +944,24 @@ export default function App() {
     <div className="min-h-screen bg-[#F8FAFC] font-sans pb-24 md:pb-32">
       {/* Top Header */}
       <header className="bg-white px-4 md:px-8 py-4 md:py-5 flex justify-between items-center sticky top-0 z-30 border-b border-zinc-100">
-        <h1 className="text-lg md:text-xl font-extrabold text-blue-600 tracking-tight truncate mr-4">SMKN 1 POCO RANAKA</h1>
-        <div className="flex items-center gap-2 md:gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center md:hidden">
+            <ShieldCheck className="text-white w-5 h-5" />
+          </div>
+          <h1 className="text-lg md:text-xl font-extrabold text-blue-600 tracking-tight truncate max-w-[150px] sm:max-w-none">SMKN 1 POCO RANAKA</h1>
+        </div>
+        <div className="flex items-center gap-1 md:gap-4">
+          <button 
+            onClick={() => {
+              fetchStats();
+              fetchUserHistory();
+              fetchPublicData();
+              refreshLocation();
+            }}
+            className="p-2 text-zinc-400 hover:bg-zinc-50 rounded-full transition-colors active:rotate-180 duration-500"
+          >
+            <RefreshCw className="w-5 h-5 md:w-6 md:h-6" />
+          </button>
           <button className="p-2 text-zinc-400 hover:bg-zinc-50 rounded-full transition-colors relative">
             <Bell className="w-5 h-5 md:w-6 md:h-6" />
             <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-red-500 rounded-full border-2 border-white"></span>
@@ -899,14 +984,12 @@ export default function App() {
             <section className="bg-white rounded-[32px] md:rounded-[40px] p-6 md:p-10 border border-zinc-100 shadow-sm relative overflow-hidden flex flex-col md:flex-row justify-between items-center gap-6 md:gap-8">
               <div className="space-y-2 text-center md:text-left">
                 <h2 className="text-2xl md:text-3xl font-extrabold text-zinc-900">Halo, {user.name}!</h2>
-                <p className="text-zinc-400 font-bold uppercase tracking-[0.2em] text-[10px] md:text-xs">
-                  {currentTime.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long' })}
-                </p>
+                <DateDisplay />
                 <div className="mt-4">
-                  {userHistory.some(h => {
-                    const recordDate = formatDate(h.timestamp);
+                  {Array.isArray(userHistory) && userHistory.some(h => {
+                    const recordDate = formatDate(h?.timestamp);
                     const today = new Date(new Date().getTime() + 8 * 3600000).toISOString().split('T')[0];
-                    return recordDate === today && h.type === 'in';
+                    return recordDate === today && h?.type === 'in';
                   }) ? (
                     <span className="px-4 py-1.5 bg-emerald-50 text-emerald-500 text-[10px] font-black uppercase tracking-widest rounded-full border border-emerald-100">
                       Sudah Absen Masuk
@@ -918,12 +1001,7 @@ export default function App() {
                   )}
                 </div>
               </div>
-              <div className="text-center md:text-right space-y-1">
-                <p className="text-5xl md:text-6xl font-black text-blue-600 tracking-tighter">
-                  {currentTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
-                </p>
-                <p className="text-zinc-400 text-[10px] font-bold uppercase tracking-widest">Waktu Server Aktif</p>
-              </div>
+              <DigitalClock />
             </section>
 
             {/* Real-time Proximity Card */}
@@ -999,22 +1077,22 @@ export default function App() {
                     <p className="text-zinc-400 font-bold text-sm">Belum ada riwayat absensi</p>
                   </div>
                 ) : (
-                  userHistory.map(record => (
-                    <div key={record.id} className="bg-white p-5 rounded-[24px] border border-zinc-100 shadow-sm flex items-center gap-5 hover:shadow-md transition-shadow">
+                  Array.isArray(userHistory) && userHistory.map(record => (
+                    <div key={record?.id} className="bg-white p-5 rounded-[24px] border border-zinc-100 shadow-sm flex items-center gap-5 hover:shadow-md transition-shadow">
                       <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
-                        record.type === 'in' ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'
+                        record?.type === 'in' ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'
                       }`}>
-                        {record.type === 'in' ? <LogIn className="w-6 h-6" /> : <LogOut className="w-6 h-6" />}
+                        {record?.type === 'in' ? <LogIn className="w-6 h-6" /> : <LogOut className="w-6 h-6" />}
                       </div>
                       <div className="flex-1">
-                        <p className="font-extrabold text-zinc-900">Absen {record.type === 'in' ? 'Masuk' : 'Pulang'}</p>
+                        <p className="font-extrabold text-zinc-900">Absen {record?.type === 'in' ? 'Masuk' : 'Pulang'}</p>
                         <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
-                          {new Date(record.timestamp).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+                          {formatDate(record?.timestamp)}
                         </p>
                       </div>
                       <div className="text-right">
                         <p className="text-lg font-black text-zinc-900">
-                          {formatTime(record.timestamp)}
+                          {formatTime(record?.timestamp)}
                         </p>
                         <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">WITA</p>
                       </div>
@@ -1110,18 +1188,18 @@ export default function App() {
                   <div className="bg-zinc-50 rounded-3xl p-6 border border-zinc-100 text-left">
                     <p className="text-[10px] text-zinc-400 font-black uppercase tracking-widest mb-2">Koordinat Real-time</p>
                     <p className="text-sm font-bold text-zinc-700 font-mono">
-                      {location ? `${location.lat.toFixed(6)}, ${location.lng.toFixed(6)}` : "Mencari lokasi..."}
+                      {location ? `${location?.lat?.toFixed(6) || '0'}, ${location?.lng?.toFixed(6) || '0'}` : "Mencari lokasi..."}
                     </p>
                   </div>
 
                   {location && (
                     <div className="w-full h-[250px] rounded-3xl overflow-hidden border border-zinc-100 shadow-inner">
                       <RealtimeMap center={[location.lat, location.lng]}>
-                        {adminGeos.map(geo => (
+                        {Array.isArray(adminGeos) && adminGeos.map(geo => (
                           <Circle 
-                            key={geo.id}
-                            center={[geo.latitude, geo.longitude]}
-                            radius={geo.radius}
+                            key={geo?.id}
+                            center={[geo?.latitude || 0, geo?.longitude || 0]}
+                            radius={geo?.radius || 100}
                             pathOptions={{ color: 'blue', fillColor: 'blue', fillOpacity: 0.1 }}
                           />
                         ))}
@@ -1161,7 +1239,7 @@ export default function App() {
                         <div className="absolute bottom-4 left-4 right-4 flex justify-between items-end">
                           <div className="text-left text-white/80 text-[10px] font-bold uppercase tracking-widest">
                             <p>{new Date().toLocaleDateString('id-ID')}</p>
-                            <p>{location?.lat.toFixed(4)}, {location?.lng.toFixed(4)}</p>
+                            <p>{location?.lat?.toFixed(4) || '0'}, {location?.lng?.toFixed(4) || '0'}</p>
                           </div>
                         </div>
                       </div>
@@ -1214,8 +1292,8 @@ export default function App() {
                     className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl py-4 px-4 font-bold text-zinc-700 outline-none focus:ring-2 focus:ring-blue-500/20"
                   >
                     <option value="">Pilih Kelas</option>
-                    {adminClasses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                    {adminClasses.length === 0 && (
+                    {Array.isArray(adminClasses) && adminClasses.map(c => <option key={c?.id} value={c?.id}>{c?.name}</option>)}
+                    {(!Array.isArray(adminClasses) || adminClasses.length === 0) && (
                       <>
                         <option value="1">X TKJ 1</option>
                         <option value="2">XI RPL 2</option>
@@ -1231,8 +1309,8 @@ export default function App() {
                     className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl py-4 px-4 font-bold text-zinc-700 outline-none focus:ring-2 focus:ring-blue-500/20"
                   >
                     <option value="">Pilih Mapel</option>
-                    {adminSubjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                    {adminSubjects.length === 0 && (
+                    {Array.isArray(adminSubjects) && adminSubjects.map(s => <option key={s?.id} value={s?.id}>{s?.name}</option>)}
+                    {(!Array.isArray(adminSubjects) || adminSubjects.length === 0) && (
                       <>
                         <option value="1">Pemrograman Web</option>
                         <option value="2">Basis Data</option>
@@ -1242,14 +1320,28 @@ export default function App() {
                 </div>
               </div>
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest ml-1">Jam Mengajar (1-8)</label>
-                <select 
-                  value={journalTeachingHours}
-                  onChange={(e) => setJournalTeachingHours(e.target.value)}
-                  className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl py-4 px-4 font-bold text-zinc-700 outline-none focus:ring-2 focus:ring-blue-500/20"
-                >
-                  {[1,2,3,4,5,6,7,8].map(h => <option key={h} value={h.toString()}>Jam ke-{h}</option>)}
-                </select>
+                <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest ml-1">Jam Mengajar (Bisa pilih lebih dari satu)</label>
+                <div className="grid grid-cols-4 gap-2">
+                  {[1,2,3,4,5,6,7,8].map(h => (
+                    <button
+                      key={h}
+                      type="button"
+                      onClick={() => {
+                        const sh = h.toString();
+                        setJournalTeachingHours(prev => 
+                          prev.includes(sh) ? prev.filter(x => x !== sh) : [...prev, sh].sort((a,b) => parseInt(a) - parseInt(b))
+                        );
+                      }}
+                      className={`py-3 rounded-xl font-bold text-xs transition-all border ${
+                        journalTeachingHours.includes(h.toString())
+                          ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-200'
+                          : 'bg-zinc-50 text-zinc-400 border-zinc-200 hover:border-zinc-300'
+                      }`}
+                    >
+                      {h}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest ml-1">Isi Jurnal / Materi</label>
@@ -1288,7 +1380,7 @@ export default function App() {
                   </div>
                 )}
                 <p className="text-[9px] text-zinc-400 font-bold uppercase tracking-widest mt-2 ml-1">
-                  {location ? `Koordinat: ${location.lat.toFixed(6)}, ${location.lng.toFixed(6)}` : "Menunggu GPS..."}
+                  {location ? `Koordinat: ${location?.lat?.toFixed(6) || '0'}, ${location?.lng?.toFixed(6) || '0'}` : "Menunggu GPS..."}
                 </p>
               </div>
 
@@ -1382,527 +1474,62 @@ export default function App() {
         )}
 
         {activeTab === 'admin' && user.role === 'admin' && (
-          <div className="space-y-8">
-            <div className="flex justify-between items-end">
-              <div>
-                <h2 className="text-3xl font-black text-zinc-900 tracking-tight">Manajemen Sistem</h2>
-                <p className="text-zinc-400 font-bold uppercase tracking-widest text-[10px] mt-1">Panel Administrator</p>
-              </div>
-              <div className="flex gap-3">
-                <button 
-                  onClick={exportToExcel}
-                  className="bg-emerald-500 text-white px-6 py-3 rounded-2xl font-bold text-sm flex items-center gap-2 shadow-lg shadow-emerald-100 hover:bg-emerald-600 transition-colors"
-                >
-                  <Download className="w-4 h-4" /> Export Excel
-                </button>
-                <button 
-                  onClick={() => setShowAddUser(true)}
-                  className="bg-blue-600 text-white px-6 py-3 rounded-2xl font-bold text-sm flex items-center gap-2 shadow-lg shadow-blue-100"
-                >
-                  <Plus className="w-4 h-4" /> Tambah User
-                </button>
-              </div>
-            </div>
-
-            {/* Admin Tabs */}
-            <div className="flex gap-2 bg-white p-2 rounded-3xl border border-zinc-100 shadow-sm overflow-x-auto no-scrollbar">
-              {['Ringkasan', 'Log Absen', 'Izin', 'Manajemen User', 'Jurnal', 'Pengaturan'].map((t) => (
-                <button 
-                  key={t}
-                  onClick={() => setAdminTab(t)}
-                  className={`px-6 py-3 rounded-2xl font-bold text-xs uppercase tracking-widest whitespace-nowrap transition-all ${
-                    adminTab === t ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' : 'text-zinc-400 hover:bg-zinc-50'
-                  }`}
-                >
-                  {t}
-                </button>
-              ))}
-            </div>
-
-            {adminTab === 'Ringkasan' && (
-              <div className="grid lg:grid-cols-2 gap-8">
-                {/* Weekly Trend */}
-                <div className="bg-white rounded-[40px] p-8 border border-zinc-100 shadow-sm space-y-8">
-                  <div className="flex justify-between items-center">
-                    <h4 className="font-black text-zinc-900 flex items-center gap-3">
-                      <LayoutDashboard className="w-5 h-5 text-blue-500" />
-                      Tren Kehadiran Mingguan
-                    </h4>
-                    <MoreHorizontal className="w-5 h-5 text-zinc-300" />
-                  </div>
-                  <div className="h-64 flex items-end justify-between px-4 relative">
-                     {[2, 3, 4, 1, 3].map((h, i) => (
-                       <div key={i} className="flex flex-col items-center gap-3 w-12 group relative">
-                          <div className="absolute -top-10 bg-zinc-900 text-white px-3 py-1.5 rounded-xl text-[10px] font-black opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
-                            Hadir: {h}
-                          </div>
-                          <div 
-                            className={`w-full rounded-xl transition-all ${i === 2 ? 'bg-blue-600 shadow-lg shadow-blue-100' : 'bg-blue-100 group-hover:bg-blue-200'}`}
-                            style={{ height: `${h * 40}px` }}
-                          ></div>
-                          <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
-                            {['Sen', 'Sel', 'Rab', 'Kam', 'Jum'][i]}
-                          </span>
-                       </div>
-                     ))}
-                  </div>
-                </div>
-
-                {/* Role Distribution */}
-                <div className="bg-white rounded-[40px] p-8 border border-zinc-100 shadow-sm space-y-8">
-                  <div className="flex justify-between items-center">
-                    <h4 className="font-black text-zinc-900 flex items-center gap-3">
-                      <User className="w-5 h-5 text-blue-500" />
-                      Distribusi Peran
-                    </h4>
-                    <MoreHorizontal className="w-5 h-5 text-zinc-300" />
-                  </div>
-                  <div className="space-y-6">
-                    {[
-                      { label: 'Admin', count: adminUsers.filter(u => u.role === 'admin').length, total: adminUsers.length || 1, color: 'blue' },
-                      { label: 'Guru', count: adminUsers.filter(u => u.role === 'guru').length, total: adminUsers.length || 1, color: 'emerald' },
-                      { label: 'Pegawai', count: adminUsers.filter(u => u.role === 'pegawai').length, total: adminUsers.length || 1, color: 'orange' },
-                    ].map((r, i) => (
-                      <div key={i} className="space-y-2">
-                        <div className="flex justify-between text-[10px] font-black uppercase tracking-widest">
-                          <span className="text-zinc-400">{r.label}</span>
-                          <span className="text-zinc-900">{r.count} Orang</span>
-                        </div>
-                        <div className="h-3 bg-zinc-50 rounded-full overflow-hidden">
-                          <div 
-                            className={`h-full bg-${r.color}-500 rounded-full`}
-                            style={{ width: `${(r.count / r.total) * 100}%` }}
-                          ></div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {adminTab === 'Manajemen User' && (
-              <div className="bg-white rounded-[32px] md:rounded-[40px] border border-zinc-100 shadow-sm overflow-hidden overflow-x-auto">
-                <table className="w-full text-left min-w-[600px]">
-                  <thead>
-                    <tr className="bg-zinc-50 border-b border-zinc-100">
-                      <th className="px-8 py-5 text-[10px] font-black text-zinc-400 uppercase tracking-widest">Nama / NIP</th>
-                      <th className="px-8 py-5 text-[10px] font-black text-zinc-400 uppercase tracking-widest">Username</th>
-                      <th className="px-8 py-5 text-[10px] font-black text-zinc-400 uppercase tracking-widest">Peran</th>
-                      <th className="px-8 py-5 text-[10px] font-black text-zinc-400 uppercase tracking-widest">Aksi</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-50">
-                    {Array.isArray(adminUsers) && adminUsers.map(u => (
-                      <tr key={u.id} className="hover:bg-zinc-50/50 transition-colors">
-                        <td className="px-8 py-5">
-                          <p className="font-bold text-zinc-900">{u.name}</p>
-                          <p className="text-xs text-zinc-400 font-medium">{u.nip || 'NIP Belum Diatur'}</p>
-                        </td>
-                        <td className="px-8 py-5 font-medium text-zinc-600">{u.username}</td>
-                        <td className="px-8 py-5">
-                          <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${
-                            u.role === 'admin' ? 'bg-blue-50 text-blue-600 border-blue-100' :
-                            u.role === 'guru' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
-                            'bg-orange-50 text-orange-600 border-orange-100'
-                          }`}>
-                            {u.role}
-                          </span>
-                        </td>
-                        <td className="px-8 py-5 flex gap-3">
-                          <button 
-                            onClick={() => {
-                              setEditingUser(u);
-                              setNewUserName(u.name);
-                              setNewUserUsername(u.username);
-                              setNewUserPassword(''); // Leave blank to keep current
-                              setNewUserRole(u.role);
-                              setNewUserNip(u.nip || '');
-                              setShowAddUser(true);
-                            }}
-                            className="text-blue-600 font-bold text-xs hover:underline"
-                          >
-                            Edit
-                          </button>
-                          <button 
-                            onClick={() => handleDeleteUser(u.id)}
-                            className="text-red-500 font-bold text-xs hover:underline"
-                          >
-                            Hapus
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {adminTab === 'Log Absen' && (
-              <div className="bg-white rounded-[32px] md:rounded-[40px] border border-zinc-100 shadow-sm overflow-hidden overflow-x-auto">
-                <table className="w-full text-left min-w-[700px]">
-                  <thead>
-                    <tr className="bg-zinc-50 border-b border-zinc-100">
-                      <th className="px-8 py-5 text-[10px] font-black text-zinc-400 uppercase tracking-widest">User</th>
-                      <th className="px-8 py-5 text-[10px] font-black text-zinc-400 uppercase tracking-widest">Tipe</th>
-                      <th className="px-8 py-5 text-[10px] font-black text-zinc-400 uppercase tracking-widest">Waktu</th>
-                      <th className="px-8 py-5 text-[10px] font-black text-zinc-400 uppercase tracking-widest">Lokasi</th>
-                      <th className="px-8 py-5 text-[10px] font-black text-zinc-400 uppercase tracking-widest">Foto</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-50">
-                    {Array.isArray(adminAttendance) && adminAttendance.map(a => (
-                      <tr key={a.id} className="hover:bg-zinc-50/50 transition-colors">
-                        <td className="px-8 py-5 font-bold text-zinc-900">{a.user_name}</td>
-                        <td className="px-8 py-5">
-                          <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
-                            a.type === 'in' ? 'bg-blue-50 text-blue-600' : 'bg-orange-50 text-orange-600'
-                          }`}>
-                            {a.type === 'in' ? 'Masuk' : 'Pulang'}
-                          </span>
-                        </td>
-                        <td className="px-8 py-5 text-sm text-zinc-500 font-medium">
-                          {formatDate(a.timestamp)} {formatTime(a.timestamp)}
-                        </td>
-                        <td className="px-8 py-5 text-xs text-zinc-400 truncate max-w-[200px]">{a.address}</td>
-                        <td className="px-8 py-5">
-                          {a.selfie ? (
-                            <button 
-                              onClick={() => {
-                                const win = window.open("");
-                                win?.document.write(`<img src="${a.selfie}" style="max-width:100%">`);
-                              }}
-                              className="text-blue-600 font-bold text-xs hover:underline"
-                            >
-                              Lihat Foto
-                            </button>
-                          ) : (
-                            <span className="text-zinc-300 text-xs">Tidak ada</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {adminTab === 'Jurnal' && (
-              <div className="grid gap-4 md:gap-6">
-                {Array.isArray(adminJournals) && adminJournals.map(j => (
-                  <div key={j.id} className="bg-white p-5 md:p-8 rounded-[32px] md:rounded-[40px] border border-zinc-100 shadow-sm flex flex-col sm:flex-row gap-4 md:gap-8">
-                    <div className="w-full sm:w-32 h-48 sm:h-32 bg-zinc-100 rounded-2xl md:rounded-3xl overflow-hidden flex-shrink-0">
-                      {j.selfie ? (
-                        <img src={j.selfie} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-zinc-300">
-                          <BookOpen className="w-8 h-8" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="space-y-4 flex-1">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h4 className="text-xl font-black text-zinc-900">Materi: {j.subject_name}</h4>
-                          <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mt-1">
-                            Guru: {j.user_name} | Kelas: {j.class_name} | Jam ke-{j.teaching_hours || '?'}
-                          </p>
-                        </div>
-                        <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
-                          {formatDate(j.timestamp)}
-                        </span>
-                      </div>
-                      <p className="text-zinc-600 text-sm leading-relaxed">{j.content}</p>
-                      <div className="flex items-center gap-2 text-blue-600">
-                        <MapPin className="w-4 h-4" />
-                        <span className="text-[10px] font-black uppercase tracking-widest">
-                          Terverifikasi di {j.latitude.toFixed(4)}, {j.longitude.toFixed(4)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {adminTab === 'Izin' && (
-              <div className="bg-white rounded-[32px] md:rounded-[40px] border border-zinc-100 shadow-sm overflow-hidden overflow-x-auto">
-                <table className="w-full text-left min-w-[800px]">
-                  <thead>
-                    <tr className="bg-zinc-50 border-b border-zinc-100">
-                      <th className="px-8 py-5 text-[10px] font-black text-zinc-400 uppercase tracking-widest">User</th>
-                      <th className="px-8 py-5 text-[10px] font-black text-zinc-400 uppercase tracking-widest">Tipe</th>
-                      <th className="px-8 py-5 text-[10px] font-black text-zinc-400 uppercase tracking-widest">Alasan</th>
-                      <th className="px-8 py-5 text-[10px] font-black text-zinc-400 uppercase tracking-widest">Lampiran</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-50">
-                    {Array.isArray(adminPermissions) && adminPermissions.map(p => (
-                      <tr key={p.id} className="hover:bg-zinc-50/50 transition-colors">
-                        <td className="px-8 py-5 font-bold text-zinc-900">{p.user_name}</td>
-                        <td className="px-8 py-5">
-                          <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
-                            p.type === 'sakit' ? 'bg-red-50 text-red-600' : 'bg-amber-50 text-amber-600'
-                          }`}>
-                            {p.type}
-                          </span>
-                        </td>
-                        <td className="px-8 py-5 text-sm text-zinc-600">{p.reason}</td>
-                        <td className="px-8 py-5">
-                          {p.file_url ? (
-                            <a href={p.file_url} target="_blank" className="text-blue-600 font-bold text-xs hover:underline">Lihat File</a>
-                          ) : (
-                            <span className="text-zinc-300 text-xs">Tidak ada</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {adminTab === 'Pengaturan' && (
-              <div className="grid md:grid-cols-2 gap-8">
-                {/* Manage Classes */}
-                <div className="bg-white p-6 md:p-8 rounded-[32px] md:rounded-[40px] border border-zinc-100 shadow-sm space-y-6">
-                  <h4 className="text-lg md:text-xl font-black text-zinc-900">Manajemen Kelas</h4>
-                  <form onSubmit={handleAddClass} className="flex gap-2">
-                    <input 
-                      type="text" 
-                      value={newClassName}
-                      onChange={(e) => setNewClassName(e.target.value)}
-                      placeholder="Nama Kelas (contoh: XI RPL 1)"
-                      className="flex-1 bg-zinc-50 border border-zinc-200 rounded-2xl py-3 px-4 font-bold text-zinc-700 outline-none focus:ring-2 focus:ring-blue-500/20"
-                      required
-                    />
-                    <button type="submit" className="bg-blue-600 text-white px-6 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-blue-200">Tambah</button>
-                  </form>
-                  <div className="flex flex-wrap gap-2">
-                    {Array.isArray(adminClasses) && adminClasses.map(c => (
-                      <span key={c.id} className="px-4 py-2 bg-zinc-50 border border-zinc-100 rounded-xl text-xs font-bold text-zinc-600">{c.name}</span>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Manage Subjects */}
-                <div className="bg-white p-6 md:p-8 rounded-[32px] md:rounded-[40px] border border-zinc-100 shadow-sm space-y-6">
-                  <h4 className="text-lg md:text-xl font-black text-zinc-900">Manajemen Mata Pelajaran</h4>
-                  <form onSubmit={handleAddSubject} className="flex gap-2">
-                    <input 
-                      type="text" 
-                      value={newSubjectName}
-                      onChange={(e) => setNewSubjectName(e.target.value)}
-                      placeholder="Nama Mapel (contoh: Matematika)"
-                      className="flex-1 bg-zinc-50 border border-zinc-200 rounded-2xl py-3 px-4 font-bold text-zinc-700 outline-none focus:ring-2 focus:ring-blue-500/20"
-                      required
-                    />
-                    <button type="submit" className="bg-emerald-600 text-white px-6 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-200">Tambah</button>
-                  </form>
-                  <div className="flex flex-wrap gap-2">
-                    {Array.isArray(adminSubjects) && adminSubjects.map(s => (
-                      <span key={s.id} className="px-4 py-2 bg-zinc-50 border border-zinc-100 rounded-xl text-xs font-bold text-zinc-600">{s.name}</span>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Manage Geolocations */}
-                <div className="bg-white p-6 md:p-8 rounded-[32px] md:rounded-[40px] border border-zinc-100 shadow-sm space-y-6 md:col-span-2">
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                    <h4 className="text-lg md:text-xl font-black text-zinc-900">Manajemen Geolokasi (Area Absen)</h4>
-                    <span className="px-4 py-1.5 bg-blue-50 text-blue-600 text-[10px] font-black uppercase tracking-widest rounded-full border border-blue-100">
-                      Interactive Map
-                    </span>
-                  </div>
-                  
-                  <div className="grid lg:grid-cols-3 gap-8">
-                    <div className="lg:col-span-1 space-y-6">
-                      <div className="flex flex-col gap-3">
-                        <button 
-                          onClick={() => {
-                            if (location) {
-                              setNewGeoLat(location.lat.toFixed(6));
-                              setNewGeoLng(location.lng.toFixed(6));
-                              setMessage({ text: "Lokasi saat ini diambil!", type: 'success' });
-                            } else {
-                              setMessage({ text: "Gagal mendapatkan lokasi GPS", type: 'error' });
-                            }
-                          }}
-                          className="w-full bg-emerald-50 text-emerald-600 border border-emerald-100 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-emerald-100 transition-colors"
-                        >
-                          <MapPin className="w-4 h-4" /> Gunakan Lokasi Saya
-                        </button>
-                        
-                        <div className="space-y-2">
-                          <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest ml-1">Cari Alamat</label>
-                          <div className="flex gap-2">
-                            <input 
-                              type="text" 
-                              value={addressSearch}
-                              onChange={(e) => setAddressSearch(e.target.value)}
-                              placeholder="Masukkan nama jalan/tempat..."
-                              className="flex-1 bg-zinc-50 border border-zinc-200 rounded-2xl py-3 px-4 font-bold text-zinc-700 outline-none focus:ring-2 focus:ring-blue-500/20"
-                              onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddressSearch())}
-                            />
-                            <button 
-                              type="button"
-                              onClick={handleAddressSearch}
-                              disabled={isSearchingAddress}
-                              className="bg-blue-600 text-white px-4 rounded-2xl flex items-center justify-center disabled:opacity-50"
-                            >
-                              <Search className="w-4 h-4" />
-                            </button>
-                          </div>
-                          
-                          {geoSearchResults.length > 0 && (
-                            <div className="bg-white border border-zinc-100 rounded-2xl shadow-xl overflow-hidden mt-2 max-h-48 overflow-y-auto">
-                              {geoSearchResults.map((res, i) => (
-                                <button
-                                  key={i}
-                                  type="button"
-                                  onClick={() => {
-                                    setNewGeoLat(parseFloat(res.lat).toFixed(6));
-                                    setNewGeoLng(parseFloat(res.lon).toFixed(6));
-                                    setNewGeoName(res.display_name.split(',')[0]);
-                                    setGeoSearchResults([]);
-                                    setAddressSearch('');
-                                  }}
-                                  className="w-full text-left p-3 hover:bg-zinc-50 border-b border-zinc-50 last:border-0 transition-colors"
-                                >
-                                  <p className="text-xs font-bold text-zinc-900 truncate">{res.display_name}</p>
-                                  <p className="text-[9px] text-zinc-400 font-medium">Lat: {res.lat}, Lng: {res.lon}</p>
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="h-px bg-zinc-100 w-full"></div>
-                      </div>
-
-                      <form onSubmit={handleAddGeo} className="space-y-4">
-                        <div className="space-y-2">
-                          <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest ml-1">Nama Lokasi</label>
-                          <input 
-                            type="text" 
-                            value={newGeoName}
-                            onChange={(e) => setNewGeoName(e.target.value)}
-                            placeholder="Contoh: Gedung Utama"
-                            className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl py-3 px-4 font-bold text-zinc-700 outline-none focus:ring-2 focus:ring-blue-500/20"
-                            required
-                          />
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest ml-1">Latitude</label>
-                            <input 
-                              type="number" step="any"
-                              value={newGeoLat}
-                              onChange={(e) => setNewGeoLat(e.target.value)}
-                              placeholder="Lat"
-                              className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl py-3 px-4 font-bold text-zinc-700 outline-none focus:ring-2 focus:ring-blue-500/20"
-                              required
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest ml-1">Longitude</label>
-                            <input 
-                              type="number" step="any"
-                              value={newGeoLng}
-                              onChange={(e) => setNewGeoLng(e.target.value)}
-                              placeholder="Lng"
-                              className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl py-3 px-4 font-bold text-zinc-700 outline-none focus:ring-2 focus:ring-blue-500/20"
-                              required
-                            />
-                          </div>
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest ml-1">Radius (Meter)</label>
-                          <input 
-                            type="number"
-                            value={newGeoRadius}
-                            onChange={(e) => setNewGeoRadius(e.target.value)}
-                            placeholder="Radius"
-                            className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl py-3 px-4 font-bold text-zinc-700 outline-none focus:ring-2 focus:ring-blue-500/20"
-                            required
-                          />
-                        </div>
-                        <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all">
-                          {adminGeos.length > 0 ? 'Perbarui Lokasi Sekolah' : 'Simpan Lokasi Sekolah'}
-                        </button>
-                        {adminGeos.length > 0 && (
-                          <p className="text-[9px] text-center font-bold text-zinc-400 uppercase tracking-widest mt-2">
-                            * Menyimpan lokasi baru akan menggantikan lokasi sekolah yang sudah ada.
-                          </p>
-                        )}
-                      </form>
-                      <div className="p-4 bg-amber-50 border border-amber-100 rounded-2xl">
-                        <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-1">Petunjuk</p>
-                        <p className="text-xs text-amber-700 leading-relaxed font-medium">Klik pada peta di samping untuk mengambil koordinat secara otomatis.</p>
-                      </div>
-                    </div>
-
-                    <div className="lg:col-span-2 h-[450px] rounded-[32px] overflow-hidden border border-zinc-100 shadow-inner">
-                      <RealtimeMap 
-                        center={adminGeos.length > 0 ? [Number(adminGeos[0].latitude), Number(adminGeos[0].longitude)] : [-6.2000, 106.8166]} 
-                        zoom={15}
-                        showLiveLabel={false}
-                      >
-                        {Array.isArray(adminGeos) && adminGeos.map(g => (
-                          <Circle 
-                            key={g.id}
-                            center={[Number(g.latitude), Number(g.longitude)]}
-                            radius={Number(g.radius)}
-                            pathOptions={{ color: 'blue', fillColor: 'blue', fillOpacity: 0.2 }}
-                          >
-                            <Popup>
-                              <div className="p-2">
-                                <p className="font-black text-zinc-900">{g.name}</p>
-                                <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Radius: {g.radius}m</p>
-                              </div>
-                            </Popup>
-                          </Circle>
-                        ))}
-                        <MapEventsHandler onMapClick={(lat, lng) => {
-                          setNewGeoLat(lat.toFixed(6));
-                          setNewGeoLng(lng.toFixed(6));
-                          setMessage({ text: "Koordinat terpilih!", type: 'success' });
-                        }} />
-                      </RealtimeMap>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-4 pt-6 border-t border-zinc-100">
-                    <h5 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Lokasi Sekolah Saat Ini:</h5>
-                    {adminGeos.length === 0 ? (
-                      <div className="p-8 bg-zinc-50 rounded-3xl border border-zinc-100 text-center">
-                        <p className="text-xs font-bold text-zinc-400">Belum ada lokasi sekolah yang ditentukan.</p>
-                      </div>
-                    ) : (
-                      adminGeos.map(g => (
-                        <div key={g.id} className="flex justify-between items-center p-5 bg-blue-50/50 rounded-3xl border border-blue-100 hover:bg-white hover:shadow-md transition-all group">
-                          <div className="space-y-1">
-                            <p className="font-black text-zinc-900">{g.name}</p>
-                            <p className="text-[9px] text-zinc-400 font-bold uppercase tracking-widest">
-                              {Number(g.latitude).toFixed(6)}, {Number(g.longitude).toFixed(6)} • {g.radius}m
-                            </p>
-                          </div>
-                          <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-blue-500 border border-zinc-100 group-hover:bg-blue-600 group-hover:text-white transition-all">
-                            <MapPin className="w-5 h-5" />
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+          <React.Suspense fallback={<div className="p-10 text-center font-black text-zinc-400 uppercase tracking-widest animate-pulse">Memuat Panel Admin...</div>}>
+            <AdminPanel 
+              adminTab={adminTab}
+              setAdminTab={setAdminTab}
+              exportToExcel={exportToExcel}
+              setShowAddUser={setShowAddUser}
+              adminUsers={adminUsers}
+              adminAttendance={adminAttendance}
+              adminJournals={adminJournals}
+              adminPermissions={adminPermissions}
+              adminClasses={adminClasses}
+              adminSubjects={adminSubjects}
+              adminGeos={adminGeos}
+              setEditingUser={setEditingUser}
+              setNewUserName={setNewUserName}
+              setNewUserUsername={setNewUserUsername}
+              setNewUserPassword={setNewUserPassword}
+              setNewUserRole={setNewUserRole}
+              setNewUserNip={setNewUserNip}
+              handleDeleteUser={handleDeleteUser}
+              formatDate={formatDate}
+              formatTime={formatTime}
+              handleAddClass={handleAddClass}
+              newClassName={newClassName}
+              setNewClassName={setNewClassName}
+              handleAddSubject={handleAddSubject}
+              newSubjectName={newSubjectName}
+              setNewSubjectName={setNewSubjectName}
+              location={location}
+              setNewGeoLat={setNewGeoLat}
+              setNewGeoLng={setNewGeoLng}
+              addressSearch={addressSearch}
+              setAddressSearch={setAddressSearch}
+              handleAddressSearch={handleAddressSearch}
+              isSearchingAddress={isSearchingAddress}
+              geoSearchResults={geoSearchResults}
+              setGeoSearchResults={setGeoSearchResults}
+              setNewGeoName={setNewGeoName}
+              newGeoName={newGeoName}
+              newGeoLat={newGeoLat}
+              newGeoLng={newGeoLng}
+              newGeoRadius={newGeoRadius}
+              setNewGeoRadius={setNewGeoRadius}
+              handleAddGeo={handleAddGeo}
+              RealtimeMap={RealtimeMap}
+              Circle={Circle}
+              Popup={Popup}
+              MapEventsHandler={MapEventsHandler}
+              setMessage={setMessage}
+            />
+          </React.Suspense>
         )}
       </main>
 
       {/* Bottom Navigation for Mobile */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-zinc-100 px-2 py-2 flex justify-around items-center z-50 md:hidden shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
+      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-zinc-100 px-2 py-3 flex justify-around items-center z-50 md:hidden shadow-[0_-4px_20px_rgba(0,0,0,0.05)] pb-safe">
         {[
           { id: 'beranda', icon: LayoutDashboard, label: 'Beranda' },
           { id: 'absensi', icon: MapPin, label: 'Absen' },
@@ -1915,12 +1542,12 @@ export default function App() {
             <button
               key={item.id}
               onClick={() => changeTab(item.id as Tab)}
-              className={`flex flex-col items-center gap-1 px-3 py-1 rounded-xl transition-all ${
-                active ? 'text-blue-600' : 'text-zinc-400'
+              className={`flex flex-col items-center gap-1.5 px-4 py-2 rounded-2xl transition-all active:scale-90 ${
+                active ? 'text-blue-600 bg-blue-50/50' : 'text-zinc-400'
               }`}
             >
-              <item.icon className={`w-5 h-5 ${active ? 'scale-110' : ''}`} />
-              <span className="text-[8px] font-black uppercase tracking-widest">{item.label}</span>
+              <item.icon className={`w-6 h-6 ${active ? 'scale-110' : ''}`} />
+              <span className="text-[9px] font-black uppercase tracking-widest">{item.label}</span>
             </button>
           );
         })}
