@@ -9,7 +9,12 @@ const DateDisplay = () => {
 
   return (
     <p className="text-zinc-400 font-bold uppercase tracking-[0.2em] text-[10px] md:text-xs">
-      {time.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long' })}
+      {time.toLocaleDateString('id-ID', { 
+        timeZone: 'Asia/Makassar',
+        weekday: 'long', 
+        day: 'numeric', 
+        month: 'long' 
+      })}
     </p>
   );
 };

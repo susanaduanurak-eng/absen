@@ -157,9 +157,19 @@ type Tab = 'beranda' | 'absensi' | 'jurnal' | 'izin' | 'admin';
 const formatDate = (date: any) => {
   if (!date) return "N/A";
   try {
+    // SQLite returns YYYY-MM-DD HH:MM:SS in WITA
+    if (typeof date === 'string' && date.includes(' ')) {
+      return date.split(' ')[0];
+    }
     const d = new Date(date);
     if (isNaN(d.getTime())) return "Invalid Date";
-    return d.toISOString().split('T')[0];
+    // Use Intl to get YYYY-MM-DD in WITA
+    return new Intl.DateTimeFormat('en-CA', { 
+      timeZone: 'Asia/Makassar', 
+      year: 'numeric', 
+      month: '2-digit', 
+      day: '2-digit' 
+    }).format(d);
   } catch (e) {
     return "Invalid Date";
   }
@@ -168,9 +178,20 @@ const formatDate = (date: any) => {
 const formatTime = (date: any) => {
   if (!date) return "N/A";
   try {
-    const d = new Date(date);
+    let d: Date;
+    if (typeof date === 'string' && !date.includes('T') && !date.includes('Z')) {
+      // Treat SQLite string as WITA
+      d = new Date(date.replace(' ', 'T') + '+08:00');
+    } else {
+      d = new Date(date);
+    }
     if (isNaN(d.getTime())) return "Invalid Time";
-    return d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleTimeString('id-ID', { 
+      timeZone: 'Asia/Makassar',
+      hour: '2-digit', 
+      minute: '2-digit',
+      hour12: false
+    });
   } catch (e) {
     return "Invalid Time";
   }
@@ -988,7 +1009,12 @@ export default function App() {
                 <div className="mt-4">
                   {Array.isArray(userHistory) && userHistory.some(h => {
                     const recordDate = formatDate(h?.timestamp);
-                    const today = new Date(new Date().getTime() + 8 * 3600000).toISOString().split('T')[0];
+                    const today = new Intl.DateTimeFormat('en-CA', { 
+                      timeZone: 'Asia/Makassar', 
+                      year: 'numeric', 
+                      month: '2-digit', 
+                      day: '2-digit' 
+                    }).format(new Date());
                     return recordDate === today && h?.type === 'in';
                   }) ? (
                     <span className="px-4 py-1.5 bg-emerald-50 text-emerald-500 text-[10px] font-black uppercase tracking-widest rounded-full border border-emerald-100">

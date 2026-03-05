@@ -315,7 +315,7 @@ async function startServer() {
     const { userId, type, latitude, longitude, address, selfie } = req.body;
     
     // MySQL vs SQLite date functions
-    const dateFunc = isMySQL ? "CURDATE()" : "date('now', 'localtime')";
+    const dateFunc = isMySQL ? "CURDATE()" : "date('now', '+8 hours')";
     const [existing]: any = await db.execute(`
       SELECT type FROM attendance 
       WHERE user_id = ? AND type = ? AND DATE(timestamp) = ${dateFunc}
@@ -362,7 +362,7 @@ async function startServer() {
   });
 
   app.get("/api/stats", async (req, res) => {
-    const dateFunc = isMySQL ? "CURDATE()" : "date('now', 'localtime')";
+    const dateFunc = isMySQL ? "CURDATE()" : "date('now', '+8 hours')";
     const [uRows]: any = await db.execute("SELECT COUNT(*) as count FROM users");
     const [aRows]: any = await db.execute(`SELECT COUNT(DISTINCT user_id) as count FROM attendance WHERE DATE(timestamp) = ${dateFunc}`);
     const [pRows]: any = await db.execute("SELECT COUNT(*) as count FROM permissions WHERE status = 'pending'");
