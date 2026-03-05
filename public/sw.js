@@ -1,4 +1,4 @@
-const CACHE_NAME = 'absensi-v2';
+const CACHE_NAME = 'absensi-v3';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -32,6 +32,22 @@ self.addEventListener('fetch', (event) => {
 
   // Skip API calls
   if (url.pathname.startsWith('/api/')) {
+    return;
+  }
+
+  // Network-first for index.html and root
+  if (url.pathname === '/' || url.pathname === '/index.html') {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          const responseToCache = response.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(request, responseToCache);
+          });
+          return response;
+        })
+        .catch(() => caches.match(request))
+    );
     return;
   }
 

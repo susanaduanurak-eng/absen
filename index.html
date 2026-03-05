@@ -67,6 +67,25 @@
         <div class="loader-text">SMKN 1 POCO RANAKA</div>
       </div>
     </div>
+    <script>
+      // Force clear cache if ?reset=true is in URL
+      if (window.location.search.includes('reset=true')) {
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then(function(registrations) {
+            for(let registration of registrations) {
+              registration.unregister();
+            }
+          });
+        }
+        if ('caches' in window) {
+          caches.keys().then(function(names) {
+            for (let name of names) caches.delete(name);
+          });
+        }
+        // Remove reset from URL and reload
+        window.location.href = window.location.origin + window.location.pathname;
+      }
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
