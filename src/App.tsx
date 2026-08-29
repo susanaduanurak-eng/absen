@@ -1549,6 +1549,7 @@ export default function App() {
               Popup={Popup}
               MapEventsHandler={MapEventsHandler}
               setMessage={setMessage}
+              fetchAdminData={fetchAdminData}
             />
           </React.Suspense>
         )}

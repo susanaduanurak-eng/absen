@@ -289,6 +289,204 @@ async function startServer() {
     res.json(rows);
   });
 
+  // Batch Import Endpoints for Excel
+  app.post("/api/admin/import/users", async (req, res) => {
+    try {
+      const { users } = req.body;
+      if (!Array.isArray(users) || users.length === 0) {
+        return res.status(400).json({ success: false, message: "Data users kosong atau format tidak valid" });
+      }
+
+      let inserted = 0;
+      let updated = 0;
+
+      for (const u of users) {
+        if (!u.username || !u.name) continue;
+        const role = u.role ? String(u.role).toLowerCase() : "pegawai";
+        const validRole = ["admin", "guru", "pegawai"].includes(role) ? role : "pegawai";
+        const password = u.password ? String(u.password) : "123456";
+        const nip = u.nip ? String(u.nip) : null;
+
+        const [existing]: any = await db.execute("SELECT id FROM users WHERE username = ?", [u.username]);
+        if (existing && existing.length > 0) {
+          if (u.password) {
+            await db.execute(
+              "UPDATE users SET name = ?, password = ?, role = ?, nip = ? WHERE username = ?",
+              [u.name, password, validRole, nip, u.username]
+            );
+          } else {
+            await db.execute(
+              "UPDATE users SET name = ?, role = ?, nip = ? WHERE username = ?",
+              [u.name, validRole, nip, u.username]
+            );
+          }
+          updated++;
+        } else {
+          await db.execute(
+            "INSERT INTO users (username, password, name, role, nip) VALUES (?, ?, ?, ?, ?)",
+            [u.username, password, u.name, validRole, nip]
+          );
+          inserted++;
+        }
+      }
+
+      res.json({ success: true, count: users.length, inserted, updated });
+    } catch (err: any) {
+      console.error("Import users error:", err);
+      res.status(500).json({ success: false, message: "Gagal import user: " + err.message });
+    }
+  });
+
+  app.post("/api/admin/import/journals", async (req, res) => {
+    try {
+      const { journals } = req.body;
+      if (!Array.isArray(journals) || journals.length === 0) {
+        return res.status(400).json({ success: false, message: "Data jurnal kosong atau format tidak valid" });
+      }
+
+      const [users]: any = await db.execute("SELECT id, username, name FROM users");
+      const [classes]: any = await db.execute("SELECT id, name FROM classes");
+      const [subjects]: any = await db.execute("SELECT id, name FROM subjects");
+
+      const userList = Array.isArray(users) ? users : [];
+      const classList = Array.isArray(classes) ? classes : [];
+      const subjectList = Array.isArray(subjects) ? subjects : [];
+
+      let inserted = 0;
+      const errors: string[] = [];
+
+      for (let idx = 0; idx < journals.length; idx++) {
+        const j = journals[idx];
+        const rowNum = idx + 2;
+
+        let userId = j.userId;
+        if (!userId && (j.teacherName || j.username)) {
+          const queryTerm = String(j.username || j.teacherName || "").trim().toLowerCase();
+          const matched = userList.find((u: any) => 
+            u.username.toLowerCase() === queryTerm ||
+            u.name.toLowerCase() === queryTerm ||
+            u.name.toLowerCase().includes(queryTerm)
+          );
+          if (matched) {
+            userId = matched.id;
+          }
+        }
+
+        if (!userId) {
+          errors.push(`Baris ${rowNum}: Guru "${j.teacherName || j.username || ''}" tidak ditemukan di sistem.`);
+          continue;
+        }
+
+        let classId = j.classId;
+        if (!classId && j.className) {
+          const cName = String(j.className).trim();
+          let matchedClass = classList.find((c: any) => c.name.toLowerCase() === cName.toLowerCase());
+          if (!matchedClass) {
+            await db.execute("INSERT INTO classes (name) VALUES (?)", [cName]);
+            const [newC]: any = await db.execute("SELECT id, name FROM classes WHERE name = ?", [cName]);
+            if (newC && newC[0]) {
+              matchedClass = newC[0];
+              classList.push(matchedClass);
+            }
+          }
+          if (matchedClass) {
+            classId = matchedClass.id;
+          }
+        }
+
+        if (!classId) {
+          errors.push(`Baris ${rowNum}: Nama kelas "${j.className || ''}" tidak valid.`);
+          continue;
+        }
+
+        let subjectId = j.subjectId;
+        if (!subjectId && j.subjectName) {
+          const sName = String(j.subjectName).trim();
+          let matchedSubject = subjectList.find((s: any) => s.name.toLowerCase() === sName.toLowerCase());
+          if (!matchedSubject) {
+            await db.execute("INSERT INTO subjects (name) VALUES (?)", [sName]);
+            const [newS]: any = await db.execute("SELECT id, name FROM subjects WHERE name = ?", [sName]);
+            if (newS && newS[0]) {
+              matchedSubject = newS[0];
+              subjectList.push(matchedSubject);
+            }
+          }
+          if (matchedSubject) {
+            subjectId = matchedSubject.id;
+          }
+        }
+
+        if (!subjectId) {
+          errors.push(`Baris ${rowNum}: Nama mata pelajaran "${j.subjectName || ''}" tidak valid.`);
+          continue;
+        }
+
+        const teachingHours = j.teachingHours ? String(j.teachingHours).trim() : "1";
+        const content = j.content ? String(j.content).trim() : "Kegiatan Belajar Mengajar";
+        const selfie = j.selfie || null;
+        const latitude = j.latitude ? Number(j.latitude) : null;
+        const longitude = j.longitude ? Number(j.longitude) : null;
+        const timestamp = j.timestamp || new Date().toISOString().slice(0, 19).replace('T', ' ');
+
+        await db.execute(`
+          INSERT INTO journals (user_id, class_id, subject_id, teaching_hours, content, selfie, latitude, longitude, timestamp)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `, [userId, classId, subjectId, teachingHours, content, selfie, latitude, longitude, timestamp]);
+
+        inserted++;
+      }
+
+      res.json({ success: true, count: journals.length, inserted, errors });
+    } catch (err: any) {
+      console.error("Import journals error:", err);
+      res.status(500).json({ success: false, message: "Gagal import jurnal: " + err.message });
+    }
+  });
+
+  app.post("/api/admin/import/classes", async (req, res) => {
+    try {
+      const { classes } = req.body;
+      if (!Array.isArray(classes)) {
+        return res.status(400).json({ success: false, message: "Data kelas tidak valid" });
+      }
+      let inserted = 0;
+      for (const name of classes) {
+        if (!name || typeof name !== 'string') continue;
+        const trimmed = name.trim();
+        const [existing]: any = await db.execute("SELECT id FROM classes WHERE name = ?", [trimmed]);
+        if (!existing || existing.length === 0) {
+          await db.execute("INSERT INTO classes (name) VALUES (?)", [trimmed]);
+          inserted++;
+        }
+      }
+      res.json({ success: true, inserted });
+    } catch (err: any) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  });
+
+  app.post("/api/admin/import/subjects", async (req, res) => {
+    try {
+      const { subjects } = req.body;
+      if (!Array.isArray(subjects)) {
+        return res.status(400).json({ success: false, message: "Data mapel tidak valid" });
+      }
+      let inserted = 0;
+      for (const name of subjects) {
+        if (!name || typeof name !== 'string') continue;
+        const trimmed = name.trim();
+        const [existing]: any = await db.execute("SELECT id FROM subjects WHERE name = ?", [trimmed]);
+        if (!existing || existing.length === 0) {
+          await db.execute("INSERT INTO subjects (name) VALUES (?)", [trimmed]);
+          inserted++;
+        }
+      }
+      res.json({ success: true, inserted });
+    } catch (err: any) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  });
+
   app.get("/api/admin/journals", async (req, res) => {
     const [rows] = await db.execute(`
       SELECT j.*, u.name as user_name, c.name as class_name, s.name as subject_name
