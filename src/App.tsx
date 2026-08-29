@@ -200,9 +200,27 @@ const formatTime = (date: any) => {
 const AdminPanel = React.lazy(() => import('./components/AdminPanel'));
 
 export default function App() {
-  const [user, setUser] = useState<UserData | null>(null);
+  const [user, setUser] = useState<UserData | null>(() => {
+    try {
+      const saved = localStorage.getItem('absensi_auth_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      return null;
+    }
+  });
   const [activeTab, setActiveTab] = useState<Tab>('beranda');
   const [history, setHistory] = useState<Tab[]>(['beranda']);
+
+  const handleSetUser = (newUser: UserData | null) => {
+    setUser(newUser);
+    try {
+      if (newUser) {
+        localStorage.setItem('absensi_auth_user', JSON.stringify(newUser));
+      } else {
+        localStorage.removeItem('absensi_auth_user');
+      }
+    } catch (e) {}
+  };
 
   // Handle Back Button
   useEffect(() => {
@@ -779,7 +797,7 @@ export default function App() {
       });
       const data = await res.json();
       if (data.success) {
-        setUser(data.user);
+        handleSetUser(data.user);
       } else {
         setMessage({ text: data.message, type: 'error' });
       }
@@ -988,7 +1006,7 @@ export default function App() {
             <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-red-500 rounded-full border-2 border-white"></span>
           </button>
           <button 
-            onClick={() => setUser(null)}
+            onClick={() => handleSetUser(null)}
             className="flex items-center gap-1 md:gap-2 px-2 md:px-4 py-2 text-zinc-500 font-bold text-[10px] md:text-xs uppercase tracking-widest hover:text-red-500 transition-colors"
           >
             <LogOut className="w-3 h-3 md:w-4 md:h-4" />
