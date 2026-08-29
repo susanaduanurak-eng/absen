@@ -67,6 +67,7 @@ CREATE TABLE `journals` (
   `user_id` int(11) NOT NULL,
   `class_id` int(11) NOT NULL,
   `subject_id` int(11) NOT NULL,
+  `teaching_hours` text DEFAULT '1',
   `content` text NOT NULL,
   `selfie` longtext DEFAULT NULL,
   `latitude` decimal(10,8) DEFAULT NULL,
@@ -98,11 +99,25 @@ CREATE TABLE `permissions` (
 -- --------------------------------------------------------
 
 -- Seed Default Data
-INSERT INTO `users` (`username`, `password`, `name`, `role`) VALUES
-('admin', 'admin123', 'Administrator', 'admin'),
-('guru', 'guru123', 'Guru Contoh', 'guru');
+INSERT INTO `users` (`username`, `password`, `name`, `role`, `nip`) VALUES
+('admin', 'admin123', 'Administrator', 'admin', '198501012010011001'),
+('guru', 'guru123', 'Guru Contoh', 'guru', '199002022015022002');
+
+INSERT INTO `classes` (`name`) VALUES
+('X RPL 1'),
+('XI RPL 1'),
+('XII RPL 1'),
+('X TKJ 1'),
+('XI TKJ 1');
+
+INSERT INTO `subjects` (`name`) VALUES
+('Pemrograman Web'),
+('Basis Data'),
+('Matematika'),
+('Bahasa Indonesia'),
+('Pendidikan Agama');
 
 INSERT INTO `geolocations` (`name`, `latitude`, `longitude`, `radius`) VALUES
-('Sekolah', -6.20000000, 106.81660000, 100);
+('SMKN 1 Poco Ranaka', -8.61800000, 120.61200000, 150);
 
 COMMIT;
