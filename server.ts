@@ -130,6 +130,22 @@ async function setupSQLite() {
       status TEXT DEFAULT 'pending',
       timestamp DATETIME DEFAULT (datetime('now', '+8 hours'))
     );
+
+    -- Attendance Indexes
+    CREATE INDEX IF NOT EXISTS idx_attendance_user_id ON attendance(user_id);
+    CREATE INDEX IF NOT EXISTS idx_attendance_timestamp ON attendance(timestamp);
+    CREATE INDEX IF NOT EXISTS idx_attendance_user_time ON attendance(user_id, timestamp);
+    CREATE INDEX IF NOT EXISTS idx_attendance_user_type_time ON attendance(user_id, type, timestamp);
+
+    -- Journals Indexes
+    CREATE INDEX IF NOT EXISTS idx_journals_user_id ON journals(user_id);
+    CREATE INDEX IF NOT EXISTS idx_journals_timestamp ON journals(timestamp);
+    CREATE INDEX IF NOT EXISTS idx_journals_user_timestamp ON journals(user_id, timestamp);
+
+    -- Permissions Indexes
+    CREATE INDEX IF NOT EXISTS idx_permissions_user_id ON permissions(user_id);
+    CREATE INDEX IF NOT EXISTS idx_permissions_timestamp ON permissions(timestamp);
+    CREATE INDEX IF NOT EXISTS idx_permissions_status ON permissions(status);
   `);
 
   // Add teaching_hours if not exists (for existing DB)
@@ -170,6 +186,24 @@ async function runMigrations() {
         const col = columns[0];
         if (col.Type.toLowerCase().includes('int')) {
           await db.execute("ALTER TABLE journals MODIFY COLUMN teaching_hours TEXT");
+        }
+      }
+
+      // Optimize Indexes for Production MySQL
+      const indexQueries = [
+        "ALTER TABLE attendance ADD INDEX idx_attendance_timestamp (timestamp)",
+        "ALTER TABLE attendance ADD INDEX idx_attendance_user_time (user_id, timestamp)",
+        "ALTER TABLE attendance ADD INDEX idx_attendance_user_type_time (user_id, type, timestamp)",
+        "ALTER TABLE journals ADD INDEX idx_journals_timestamp (timestamp)",
+        "ALTER TABLE journals ADD INDEX idx_journals_user_timestamp (user_id, timestamp)",
+        "ALTER TABLE permissions ADD INDEX idx_permissions_timestamp (timestamp)",
+        "ALTER TABLE permissions ADD INDEX idx_permissions_status (status)"
+      ];
+      for (const q of indexQueries) {
+        try {
+          await db.execute(q);
+        } catch (e) {
+          // Ignore if index already exists
         }
       }
     } else {

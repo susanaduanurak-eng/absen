@@ -3,7 +3,8 @@ name: Auto Deploy to Hostinger
 on:
   push:
     branches:
-      - main # atau 'master', sesuaikan dengan nama branch utama Anda
+      - main
+      - master
 
 jobs:
   build-and-deploy:
@@ -17,20 +18,21 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
 
       - name: 📦 Install Dependencies
-        run: npm ci || npm install
+        run: npm install --legacy-peer-deps
 
-      - name: 🏗️ Build Frontend & API
-        run: npm run build
+      - name: 🏗️ Build Frontend Only (Vite SPA)
+        run: npx vite build
 
       - name: 🚀 Deploy ke Hostinger via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
-          server: ${{ secrets.FTP_SERVER }}       # Contoh: ftp.domainanda.com atau IP Hostinger
-          username: ${{ secrets.FTP_USERNAME }}   # Username FTP Hostinger Anda
-          password: ${{ secrets.FTP_PASSWORD }}   # Password FTP Hostinger Anda
-          server-dir: public_html/                # Target folder di Hostinger
-          local-dir: dist/                        # Folder hasil kompilasi yang di-deploy
-          dangerous-clean-slate: false            # Jangan hapus file di luar dist (agar aman)
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          server-dir: public_html/
+          local-dir: dist/
+          protocol: ftp
+          port: 21
+          dangerous-clean-slate: false

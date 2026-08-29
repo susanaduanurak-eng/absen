@@ -2,28 +2,41 @@
   RewriteEngine On
   RewriteBase /
 
-  # 1. Route all /api/* requests to the PHP backend
+  # 1. Route all /api/* requests to PHP backend if they don't point to a real file
   RewriteCond %{REQUEST_URI} ^/api/.*$ [NC]
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteRule ^api/(.*)$ api/index.php/$1 [QSA,L]
 
-  # 2. Serve actual existing files or directories directly
+  # 2. Serve actual existing files, directories, or assets directly without rewrite
   RewriteCond %{REQUEST_FILENAME} -f [OR]
   RewriteCond %{REQUEST_FILENAME} -d
   RewriteRule ^ - [L]
 
-  # 3. Fallback all frontend routes to index.html for React SPA
+  # 3. SPA Fallback: Redirect all other frontend routes to index.html for React
   RewriteRule ^ index.html [L]
 </IfModule>
 
-# Security & Compression Headers
+# Security & CORS Headers
 <IfModule mod_headers.c>
   Header set Access-Control-Allow-Origin "*"
   Header set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
   Header set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With"
+  # Prevent MIME type sniffing
+  Header set X-Content-Type-Options "nosniff"
 </IfModule>
 
-# Gzip Compression
+# Gzip & Brotli Compression for fast loading
 <IfModule mod_deflate.c>
-  AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css text/javascript application/javascript application/json application/xml
+  AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css text/javascript application/javascript application/json application/xml application/x-javascript
+</IfModule>
+
+# Cache-Control for static assets & prevent caching index.html
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType text/html "access plus 0 seconds"
+  ExpiresByType text/css "access plus 1 month"
+  ExpiresByType application/javascript "access plus 1 month"
+  ExpiresByType image/png "access plus 1 month"
+  ExpiresByType image/jpeg "access plus 1 month"
+  ExpiresByType image/svg+xml "access plus 1 month"
 </IfModule>

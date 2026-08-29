@@ -57,7 +57,10 @@ CREATE TABLE `attendance` (
   `address` text DEFAULT NULL,
   `selfie` longtext DEFAULT NULL,
   PRIMARY KEY (`id`),
-  KEY `user_id` (`user_id`),
+  KEY `idx_attendance_user_id` (`user_id`),
+  KEY `idx_attendance_timestamp` (`timestamp`),
+  KEY `idx_attendance_user_time` (`user_id`, `timestamp`),
+  KEY `idx_attendance_user_type_time` (`user_id`, `type`, `timestamp`),
   CONSTRAINT `attendance_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -74,9 +77,11 @@ CREATE TABLE `journals` (
   `longitude` decimal(11,8) DEFAULT NULL,
   `timestamp` datetime DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  KEY `user_id` (`user_id`),
-  KEY `class_id` (`class_id`),
-  KEY `subject_id` (`subject_id`),
+  KEY `idx_journals_user_id` (`user_id`),
+  KEY `idx_journals_class_id` (`class_id`),
+  KEY `idx_journals_subject_id` (`subject_id`),
+  KEY `idx_journals_timestamp` (`timestamp`),
+  KEY `idx_journals_user_timestamp` (`user_id`, `timestamp`),
   CONSTRAINT `journals_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
   CONSTRAINT `journals_ibfk_2` FOREIGN KEY (`class_id`) REFERENCES `classes` (`id`),
   CONSTRAINT `journals_ibfk_3` FOREIGN KEY (`subject_id`) REFERENCES `subjects` (`id`)
@@ -92,7 +97,10 @@ CREATE TABLE `permissions` (
   `status` enum('pending','approved','rejected') DEFAULT 'pending',
   `timestamp` datetime DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  KEY `user_id` (`user_id`),
+  KEY `idx_permissions_user_id` (`user_id`),
+  KEY `idx_permissions_timestamp` (`timestamp`),
+  KEY `idx_permissions_status` (`status`),
+  KEY `idx_permissions_user_timestamp` (`user_id`, `timestamp`),
   CONSTRAINT `permissions_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
