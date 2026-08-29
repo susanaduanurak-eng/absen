@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - master
+  workflow_dispatch:
 
 jobs:
   build-and-deploy:
@@ -18,12 +19,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: 'npm'
 
       - name: 📦 Install Dependencies
         run: npm install --legacy-peer-deps
 
-      - name: 🏗️ Build Frontend Only (Vite SPA)
-        run: npx vite build
+      - name: 🏗️ Build Frontend (Vite SPA)
+        run: npm run build
 
       - name: 🚀 Deploy ke Hostinger via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
@@ -31,8 +33,9 @@ jobs:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
-          server-dir: public_html/
+          server-dir: ${{ secrets.FTP_SERVER_DIR || 'public_html/' }}
           local-dir: dist/
           protocol: ftp
           port: 21
+          timeout: 60000
           dangerous-clean-slate: false
