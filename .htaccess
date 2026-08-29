@@ -1,18 +1,35 @@
+# Explicit MIME Types for Vite, React & PWA
+<IfModule mod_mime.c>
+  AddType application/javascript .js .mjs
+  AddType application/json .json .webmanifest
+  AddType text/css .css
+  AddType image/svg+xml .svg
+  AddType image/x-icon .ico
+  AddType image/png .png
+  AddType image/jpeg .jpg .jpeg
+  AddType font/woff2 .woff2
+  AddType font/woff .woff
+</IfModule>
+
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /
 
-  # 1. Route all /api/* requests to PHP backend if they don't point to a real file
+  # 1. Route /api/* requests to PHP backend if not pointing to an existing file
   RewriteCond %{REQUEST_URI} ^/api/.*$ [NC]
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteRule ^api/(.*)$ api/index.php/$1 [QSA,L]
 
-  # 2. Serve actual existing files, directories, or assets directly without rewrite
+  # 2. Serve actual existing files or directories directly
   RewriteCond %{REQUEST_FILENAME} -f [OR]
   RewriteCond %{REQUEST_FILENAME} -d
   RewriteRule ^ - [L]
 
-  # 3. SPA Fallback: Redirect all other frontend routes to index.html for React
+  # 3. Prevent rewriting missing static assets to index.html (returns 404 so browser doesn't try to parse HTML as JS/JSON)
+  RewriteCond %{REQUEST_URI} \.(js|mjs|css|json|webmanifest|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot|map)$ [NC]
+  RewriteRule ^ - [R=404,L]
+
+  # 4. SPA Fallback: Redirect all other frontend navigation routes to index.html
   RewriteRule ^ index.html [L]
 </IfModule>
 
@@ -21,16 +38,15 @@
   Header set Access-Control-Allow-Origin "*"
   Header set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
   Header set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With"
-  # Prevent MIME type sniffing
   Header set X-Content-Type-Options "nosniff"
 </IfModule>
 
-# Gzip & Brotli Compression for fast loading
+# Gzip Compression for fast loading
 <IfModule mod_deflate.c>
   AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css text/javascript application/javascript application/json application/xml application/x-javascript
 </IfModule>
 
-# Cache-Control for static assets & prevent caching index.html
+# Cache-Control: Cache static assets, but do not cache index.html
 <IfModule mod_expires.c>
   ExpiresActive On
   ExpiresByType text/html "access plus 0 seconds"
@@ -39,4 +55,5 @@
   ExpiresByType image/png "access plus 1 month"
   ExpiresByType image/jpeg "access plus 1 month"
   ExpiresByType image/svg+xml "access plus 1 month"
+  ExpiresByType application/json "access plus 0 seconds"
 </IfModule>
