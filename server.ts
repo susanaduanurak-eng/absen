@@ -19,13 +19,19 @@ let isMySQL = false;
 async function initDB() {
   if (process.env.DB_HOST) {
     try {
-      db = await mysql.createConnection({
+      console.log(`Connecting to MySQL at ${process.env.DB_HOST}...`);
+      const connectionPromise = mysql.createConnection({
         host: process.env.DB_HOST,
         user: process.env.DB_USER,
         password: process.env.DB_PASSWORD,
         database: process.env.DB_NAME,
         port: Number(process.env.DB_PORT || 3306),
+        connectTimeout: 3000,
       });
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error("MySQL connection timeout (3s)")), 3500)
+      );
+      db = await Promise.race([connectionPromise, timeoutPromise]);
       isMySQL = true;
       console.log("Connected to MySQL Database");
     } catch (err) {
@@ -591,7 +597,7 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(__dirname, "..", "dist");
+    const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
     app.get("*", (req, res) => {
       res.sendFile(path.join(distPath, "index.html"));
