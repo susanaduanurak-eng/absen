@@ -1,24 +1,33 @@
 import express from "express";
 import { createServer as createViteServer } from "vite";
-import mysql from "mysql2/promise";
+import { Pool as NeonPool } from "@neondatabase/serverless";
 import pg from "pg";
-import { open } from "sqlite";
-import sqlite3 from "sqlite3";
 import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 
 dotenv.config();
 
-const { Pool } = pg;
+const { Pool: PgPool } = pg;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export const app = express();
 app.use(express.json({ limit: "50mb" }));
 
+// Enable CORS
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
 type DBType = "postgres" | "mysql" | "sqlite";
-let dbType: DBType = "sqlite";
+export let dbType: DBType = "sqlite";
 let db: any;
 let isInitialized = false;
 
@@ -36,34 +45,30 @@ function getDateFilter(): string {
   return "DATE(timestamp) = date('now', '+8 hours')";
 }
 
-async function setupPostgreSQL(connectionString: string) {
+async function setupNeonPostgres(connectionString: string) {
   try {
-    const pool = new Pool({
-      connectionString,
-      ssl: {
-        rejectUnauthorized: false,
-      },
-    });
+    console.log("Connecting to Neon PostgreSQL...");
+    const pool = new NeonPool({ connectionString });
 
     // Test connection
     await pool.query("SELECT 1");
 
     db = {
-      execute: async (sql: string, params: any[] = []) => {
-        const pgSql = formatQuery(sql);
+      execute: async (queryStr: string, params: any[] = []) => {
+        const pgSql = formatQuery(queryStr);
         const res = await pool.query(pgSql, params);
         return [res.rows, res];
       },
-      query: async (sql: string, params: any[] = []) => {
-        const pgSql = formatQuery(sql);
+      query: async (queryStr: string, params: any[] = []) => {
+        const pgSql = formatQuery(queryStr);
         const res = await pool.query(pgSql, params);
         return [res.rows, res];
       },
     };
     dbType = "postgres";
-    console.log("Connected to Neon / PostgreSQL Database");
+    console.log("Connected successfully to Neon PostgreSQL");
 
-    // Auto create tables if not exists
+    // Auto create tables
     await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -97,7 +102,7 @@ async function setupPostgreSQL(connectionString: string) {
         id SERIAL PRIMARY KEY,
         user_id INTEGER,
         type VARCHAR(50),
-        timestamp TIMESTAMP DEFAULT NOW(),
+        timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
         latitude DOUBLE PRECISION,
         longitude DOUBLE PRECISION,
         address TEXT,
@@ -114,7 +119,7 @@ async function setupPostgreSQL(connectionString: string) {
         selfie TEXT,
         latitude DOUBLE PRECISION,
         longitude DOUBLE PRECISION,
-        timestamp TIMESTAMP DEFAULT NOW()
+        timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
 
       CREATE TABLE IF NOT EXISTS permissions (
@@ -124,18 +129,13 @@ async function setupPostgreSQL(connectionString: string) {
         reason TEXT,
         file_url TEXT,
         status VARCHAR(50) DEFAULT 'pending',
-        timestamp TIMESTAMP DEFAULT NOW()
+        timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
     `);
 
-    // Migration for teaching_hours column
-    try {
-      await pool.query("ALTER TABLE journals ADD COLUMN IF NOT EXISTS teaching_hours VARCHAR(100)");
-    } catch (e) {}
-
-    // Seed default data for PostgreSQL
-    const userRes = await pool.query("SELECT id FROM users LIMIT 1");
-    if (userRes.rows.length === 0) {
+    // Seed default users if empty
+    const users = await pool.query("SELECT id FROM users LIMIT 1");
+    if (users.rows.length === 0) {
       await pool.query(
         "INSERT INTO users (username, password, name, role) VALUES ($1, $2, $3, $4)",
         ["admin", "admin123", "Administrator", "admin"]
@@ -144,25 +144,54 @@ async function setupPostgreSQL(connectionString: string) {
         "INSERT INTO users (username, password, name, role) VALUES ($1, $2, $3, $4)",
         ["guru", "guru123", "Guru Contoh", "guru"]
       );
-      console.log("Seeded default users (admin, guru) to PostgreSQL");
+      console.log("Seeded initial users in Neon DB");
     }
 
-    const geoRes = await pool.query("SELECT id FROM geolocations LIMIT 1");
-    if (geoRes.rows.length === 0) {
+    const geos = await pool.query("SELECT id FROM geolocations LIMIT 1");
+    if (geos.rows.length === 0) {
       await pool.query(
         "INSERT INTO geolocations (name, latitude, longitude, radius) VALUES ($1, $2, $3, $4)",
         ["Sekolah", -6.2000, 106.8166, 100]
       );
-      console.log("Seeded default geolocation to PostgreSQL");
+      console.log("Seeded initial geolocation in Neon DB");
     }
-  } catch (err) {
-    console.error("Failed to connect to Neon / PostgreSQL, falling back to SQLite:", err);
-    await setupSQLite();
+  } catch (err: any) {
+    console.error("Neon connection failed:", err);
+    throw err;
+  }
+}
+
+async function setupPostgreSQL(connectionString: string) {
+  try {
+    const pool = new PgPool({
+      connectionString,
+      ssl: { rejectUnauthorized: false },
+    });
+    await pool.query("SELECT 1");
+
+    db = {
+      execute: async (sqlStr: string, params: any[] = []) => {
+        const pgSql = formatQuery(sqlStr);
+        const res = await pool.query(pgSql, params);
+        return [res.rows, res];
+      },
+      query: async (sqlStr: string, params: any[] = []) => {
+        const pgSql = formatQuery(sqlStr);
+        const res = await pool.query(pgSql, params);
+        return [res.rows, res];
+      },
+    };
+    dbType = "postgres";
+    console.log("Connected to PostgreSQL Database");
+  } catch (err: any) {
+    console.error("PostgreSQL connection error:", err);
+    throw err;
   }
 }
 
 async function setupMySQL() {
   try {
+    const mysql = (await import("mysql2/promise")).default;
     const mysqlConn = await mysql.createConnection({
       host: process.env.DB_HOST,
       user: process.env.DB_USER,
@@ -174,32 +203,34 @@ async function setupMySQL() {
     dbType = "mysql";
     console.log("Connected to MySQL Database");
   } catch (err) {
-    console.error("Failed to connect to MySQL, falling back to SQLite:", err);
-    await setupSQLite();
+    console.error("Failed to connect to MySQL:", err);
+    throw err;
   }
 }
 
 async function setupSQLite() {
   try {
+    const { open } = await import("sqlite");
+    const sqlite3 = (await import("sqlite3")).default;
+
     const sqliteDb = await open({
       filename: "attendance.db",
       driver: sqlite3.Database,
     });
     dbType = "sqlite";
 
-    // Wrapper to mimic mysql2/pg execution for simple queries
     db = {
-      execute: async (sql: string, params: any[] = []) => {
-        if (sql.trim().toUpperCase().startsWith("SELECT")) {
-          const rows = await sqliteDb.all(sql, params);
+      execute: async (sqlStr: string, params: any[] = []) => {
+        if (sqlStr.trim().toUpperCase().startsWith("SELECT")) {
+          const rows = await sqliteDb.all(sqlStr, params);
           return [rows];
         } else {
-          const result = await sqliteDb.run(sql, params);
+          const result = await sqliteDb.run(sqlStr, params);
           return [{ insertId: result.lastID, affectedRows: result.changes }];
         }
       },
-      query: async (sql: string, params: any[] = []) => {
-        const rows = await sqliteDb.all(sql, params);
+      query: async (sqlStr: string, params: any[] = []) => {
+        const rows = await sqliteDb.all(sqlStr, params);
         return [rows];
       },
     };
@@ -268,7 +299,7 @@ async function setupSQLite() {
       );
     `);
 
-    // Seed default data for SQLite
+    // Seed default users for SQLite
     const admin = await sqliteDb.get("SELECT * FROM users WHERE username = ?", "admin");
     if (!admin) {
       await sqliteDb.run("INSERT INTO users (username, password, name, role) VALUES (?, ?, ?, ?)", "admin", "admin123", "Administrator", "admin");
@@ -282,22 +313,56 @@ async function setupSQLite() {
       await sqliteDb.run("INSERT INTO geolocations (name, latitude, longitude, radius) VALUES (?, ?, ?, ?)", "Sekolah", -6.2000, 106.8166, 100);
     }
 
-    console.log("Using SQLite Database (Preview Mode)");
+    console.log("Using SQLite Database (Local Mode)");
   } catch (err) {
-    console.error("Critical Error: SQLite initialization failed:", err);
+    console.error("SQLite initialization error:", err);
   }
 }
 
 export async function initDB() {
-  const pgUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.NEON_DATABASE_URL;
-  if (pgUrl || process.env.PGHOST) {
-    const connStr = pgUrl || `postgresql://${process.env.PGUSER}:${process.env.PGPASSWORD}@${process.env.PGHOST}:${process.env.PGPORT || 5432}/${process.env.PGDATABASE}?sslmode=require`;
-    await setupPostgreSQL(connStr);
-  } else if (process.env.DB_HOST) {
-    await setupMySQL();
-  } else {
-    await setupSQLite();
+  const pgUrl =
+    process.env.DATABASE_URL ||
+    process.env.POSTGRES_URL ||
+    process.env.POSTGRES_PRISMA_URL ||
+    process.env.POSTGRES_URL_NON_POOLING ||
+    process.env.NEON_DATABASE_URL;
+
+  if (pgUrl) {
+    try {
+      await setupNeonPostgres(pgUrl);
+      return;
+    } catch (neonErr) {
+      console.warn("Neon driver failed, trying pg Pool:", neonErr);
+      try {
+        await setupPostgreSQL(pgUrl);
+        return;
+      } catch (pgErr) {
+        console.error("All PostgreSQL connections failed:", pgErr);
+      }
+    }
   }
+
+  if (process.env.PGHOST) {
+    const connStr = `postgresql://${process.env.PGUSER}:${process.env.PGPASSWORD}@${process.env.PGHOST}:${process.env.PGPORT || 5432}/${process.env.PGDATABASE}?sslmode=require`;
+    try {
+      await setupNeonPostgres(connStr);
+      return;
+    } catch (err) {
+      console.error("PGHOST connection failed:", err);
+    }
+  }
+
+  if (process.env.DB_HOST) {
+    try {
+      await setupMySQL();
+      return;
+    } catch (err) {
+      console.error("MySQL setup failed:", err);
+    }
+  }
+
+  // Fallback to SQLite (only if not on Vercel serverless without SQLite)
+  await setupSQLite();
 }
 
 export async function runMigrations() {
@@ -306,20 +371,10 @@ export async function runMigrations() {
       const [columns]: any = await db.execute("SHOW COLUMNS FROM journals LIKE 'teaching_hours'");
       if (columns.length === 0) {
         await db.execute("ALTER TABLE journals ADD COLUMN teaching_hours TEXT");
-      } else {
-        const col = columns[0];
-        if (col.Type.toLowerCase().includes("int")) {
-          await db.execute("ALTER TABLE journals MODIFY COLUMN teaching_hours TEXT");
-        }
       }
     } else if (dbType === "postgres") {
       try {
         await db.execute("ALTER TABLE journals ADD COLUMN IF NOT EXISTS teaching_hours VARCHAR(100)");
-      } catch (e) {}
-    } else {
-      const sqliteDb = await open({ filename: "attendance.db", driver: sqlite3.Database });
-      try {
-        await sqliteDb.exec("ALTER TABLE journals ADD COLUMN teaching_hours TEXT");
       } catch (e) {}
     }
   } catch (err) {
@@ -327,20 +382,38 @@ export async function runMigrations() {
   }
 }
 
-// Middleware to ensure DB connection is ready before processing API requests
-app.use("/api", async (req, res, next) => {
-  if (!isInitialized) {
-    await initDB();
-    await runMigrations();
-    isInitialized = true;
+// Router for API endpoints
+export const apiRouter = express.Router();
+
+apiRouter.get("/health", async (req, res) => {
+  try {
+    if (!db) {
+      await initDB();
+    }
+    const [rows]: any = await db.execute("SELECT 1 as connected");
+    res.json({
+      status: "ok",
+      dbType,
+      dbConnected: true,
+      hasPostgresEnv: Boolean(process.env.DATABASE_URL || process.env.POSTGRES_URL),
+    });
+  } catch (err: any) {
+    res.status(500).json({
+      status: "error",
+      dbType,
+      dbConnected: false,
+      error: err?.message || String(err),
+      hint: "Pastikan variabel DATABASE_URL atau POSTGRES_URL sudah diisi di Environment Variables Vercel.",
+    });
   }
-  next();
 });
 
-// API Routes
-app.post("/api/login", async (req, res) => {
+apiRouter.post("/login", async (req, res) => {
   const { username, password } = req.body;
   try {
+    if (!db) {
+      await initDB();
+    }
     const [rows]: any = await db.execute(
       "SELECT id, username, name, role, nip FROM users WHERE username = ? AND password = ?",
       [username, password]
@@ -357,8 +430,9 @@ app.post("/api/login", async (req, res) => {
   }
 });
 
-app.get("/api/geolocations", async (req, res) => {
+apiRouter.get("/geolocations", async (req, res) => {
   try {
+    if (!db) await initDB();
     const [rows] = await db.execute("SELECT * FROM geolocations");
     res.json(rows);
   } catch (err: any) {
@@ -366,8 +440,9 @@ app.get("/api/geolocations", async (req, res) => {
   }
 });
 
-app.get("/api/admin/users", async (req, res) => {
+apiRouter.get("/admin/users", async (req, res) => {
   try {
+    if (!db) await initDB();
     const [rows] = await db.execute("SELECT id, username, name, role, nip FROM users");
     res.json(rows);
   } catch (err: any) {
@@ -375,9 +450,10 @@ app.get("/api/admin/users", async (req, res) => {
   }
 });
 
-app.post("/api/admin/users", async (req, res) => {
+apiRouter.post("/admin/users", async (req, res) => {
   const { username, password, name, role, nip } = req.body;
   try {
+    if (!db) await initDB();
     await db.execute("INSERT INTO users (username, password, name, role, nip) VALUES (?, ?, ?, ?, ?)", [
       username,
       password,
@@ -391,10 +467,11 @@ app.post("/api/admin/users", async (req, res) => {
   }
 });
 
-app.put("/api/admin/users/:id", async (req, res) => {
+apiRouter.put("/admin/users/:id", async (req, res) => {
   const { username, password, name, role, nip } = req.body;
   const { id } = req.params;
   try {
+    if (!db) await initDB();
     if (password) {
       await db.execute(
         "UPDATE users SET username = ?, password = ?, name = ?, role = ?, nip = ? WHERE id = ?",
@@ -415,9 +492,10 @@ app.put("/api/admin/users/:id", async (req, res) => {
   }
 });
 
-app.delete("/api/admin/users/:id", async (req, res) => {
+apiRouter.delete("/admin/users/:id", async (req, res) => {
   const { id } = req.params;
   try {
+    if (!db) await initDB();
     await db.execute("DELETE FROM users WHERE id = ?", [id]);
     res.json({ success: true });
   } catch (e: any) {
@@ -425,8 +503,9 @@ app.delete("/api/admin/users/:id", async (req, res) => {
   }
 });
 
-app.get("/api/admin/classes", async (req, res) => {
+apiRouter.get("/admin/classes", async (req, res) => {
   try {
+    if (!db) await initDB();
     const [rows] = await db.execute("SELECT * FROM classes");
     res.json(rows);
   } catch (err: any) {
@@ -434,8 +513,9 @@ app.get("/api/admin/classes", async (req, res) => {
   }
 });
 
-app.post("/api/admin/classes", async (req, res) => {
+apiRouter.post("/admin/classes", async (req, res) => {
   try {
+    if (!db) await initDB();
     await db.execute("INSERT INTO classes (name) VALUES (?)", [req.body.name]);
     res.json({ success: true });
   } catch (err: any) {
@@ -443,8 +523,9 @@ app.post("/api/admin/classes", async (req, res) => {
   }
 });
 
-app.get("/api/admin/subjects", async (req, res) => {
+apiRouter.get("/admin/subjects", async (req, res) => {
   try {
+    if (!db) await initDB();
     const [rows] = await db.execute("SELECT * FROM subjects");
     res.json(rows);
   } catch (err: any) {
@@ -452,8 +533,9 @@ app.get("/api/admin/subjects", async (req, res) => {
   }
 });
 
-app.post("/api/admin/subjects", async (req, res) => {
+apiRouter.post("/admin/subjects", async (req, res) => {
   try {
+    if (!db) await initDB();
     await db.execute("INSERT INTO subjects (name) VALUES (?)", [req.body.name]);
     res.json({ success: true });
   } catch (err: any) {
@@ -461,8 +543,9 @@ app.post("/api/admin/subjects", async (req, res) => {
   }
 });
 
-app.get("/api/admin/geolocations", async (req, res) => {
+apiRouter.get("/admin/geolocations", async (req, res) => {
   try {
+    if (!db) await initDB();
     const [rows] = await db.execute("SELECT * FROM geolocations");
     res.json(rows);
   } catch (err: any) {
@@ -470,9 +553,10 @@ app.get("/api/admin/geolocations", async (req, res) => {
   }
 });
 
-app.post("/api/admin/geolocations", async (req, res) => {
+apiRouter.post("/admin/geolocations", async (req, res) => {
   const { name, latitude, longitude, radius } = req.body;
   try {
+    if (!db) await initDB();
     await db.execute("DELETE FROM geolocations");
     await db.execute("INSERT INTO geolocations (name, latitude, longitude, radius) VALUES (?, ?, ?, ?)", [
       name,
@@ -486,8 +570,9 @@ app.post("/api/admin/geolocations", async (req, res) => {
   }
 });
 
-app.get("/api/admin/attendance", async (req, res) => {
+apiRouter.get("/admin/attendance", async (req, res) => {
   try {
+    if (!db) await initDB();
     const [rows] = await db.execute(`
       SELECT a.*, u.name as user_name 
       FROM attendance a
@@ -500,9 +585,9 @@ app.get("/api/admin/attendance", async (req, res) => {
   }
 });
 
-// Batch Import Endpoints for Excel
-app.post("/api/admin/import/users", async (req, res) => {
+apiRouter.post("/admin/import/users", async (req, res) => {
   try {
+    if (!db) await initDB();
     const { users } = req.body;
     if (!Array.isArray(users) || users.length === 0) {
       return res.status(400).json({ success: false, message: "Data users kosong atau format tidak valid" });
@@ -548,8 +633,9 @@ app.post("/api/admin/import/users", async (req, res) => {
   }
 });
 
-app.post("/api/admin/import/journals", async (req, res) => {
+apiRouter.post("/admin/import/journals", async (req, res) => {
   try {
+    if (!db) await initDB();
     const { journals } = req.body;
     if (!Array.isArray(journals) || journals.length === 0) {
       return res.status(400).json({ success: false, message: "Data jurnal kosong atau format tidak valid" });
@@ -656,8 +742,9 @@ app.post("/api/admin/import/journals", async (req, res) => {
   }
 });
 
-app.post("/api/admin/import/classes", async (req, res) => {
+apiRouter.post("/admin/import/classes", async (req, res) => {
   try {
+    if (!db) await initDB();
     const { classes } = req.body;
     if (!Array.isArray(classes)) {
       return res.status(400).json({ success: false, message: "Data kelas tidak valid" });
@@ -678,8 +765,9 @@ app.post("/api/admin/import/classes", async (req, res) => {
   }
 });
 
-app.post("/api/admin/import/subjects", async (req, res) => {
+apiRouter.post("/admin/import/subjects", async (req, res) => {
   try {
+    if (!db) await initDB();
     const { subjects } = req.body;
     if (!Array.isArray(subjects)) {
       return res.status(400).json({ success: false, message: "Data mapel tidak valid" });
@@ -700,8 +788,9 @@ app.post("/api/admin/import/subjects", async (req, res) => {
   }
 });
 
-app.get("/api/admin/journals", async (req, res) => {
+apiRouter.get("/admin/journals", async (req, res) => {
   try {
+    if (!db) await initDB();
     const [rows] = await db.execute(`
       SELECT j.*, u.name as user_name, c.name as class_name, s.name as subject_name
       FROM journals j
@@ -716,8 +805,9 @@ app.get("/api/admin/journals", async (req, res) => {
   }
 });
 
-app.get("/api/admin/permissions", async (req, res) => {
+apiRouter.get("/admin/permissions", async (req, res) => {
   try {
+    if (!db) await initDB();
     const [rows] = await db.execute(`
       SELECT p.*, u.name as user_name
       FROM permissions p
@@ -730,9 +820,10 @@ app.get("/api/admin/permissions", async (req, res) => {
   }
 });
 
-app.post("/api/attendance", async (req, res) => {
+apiRouter.post("/attendance", async (req, res) => {
   const { userId, type, latitude, longitude, address, selfie } = req.body;
   try {
+    if (!db) await initDB();
     const [existing]: any = await db.execute(
       `SELECT type FROM attendance WHERE user_id = ? AND type = ? AND ${getDateFilter()}`,
       [userId, type]
@@ -758,8 +849,9 @@ app.post("/api/attendance", async (req, res) => {
   }
 });
 
-app.get("/api/classes", async (req, res) => {
+apiRouter.get("/classes", async (req, res) => {
   try {
+    if (!db) await initDB();
     const [rows] = await db.execute("SELECT * FROM classes");
     res.json(rows);
   } catch (err: any) {
@@ -767,8 +859,9 @@ app.get("/api/classes", async (req, res) => {
   }
 });
 
-app.get("/api/subjects", async (req, res) => {
+apiRouter.get("/subjects", async (req, res) => {
   try {
+    if (!db) await initDB();
     const [rows] = await db.execute("SELECT * FROM subjects");
     res.json(rows);
   } catch (err: any) {
@@ -776,9 +869,10 @@ app.get("/api/subjects", async (req, res) => {
   }
 });
 
-app.post("/api/journals", async (req, res) => {
+apiRouter.post("/journals", async (req, res) => {
   const { userId, classId, subjectId, teachingHours, content, selfie, latitude, longitude } = req.body;
   try {
+    if (!db) await initDB();
     await db.execute(
       `INSERT INTO journals (user_id, class_id, subject_id, teaching_hours, content, selfie, latitude, longitude)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -790,9 +884,10 @@ app.post("/api/journals", async (req, res) => {
   }
 });
 
-app.post("/api/permissions", async (req, res) => {
+apiRouter.post("/permissions", async (req, res) => {
   const { userId, type, reason, fileUrl } = req.body;
   try {
+    if (!db) await initDB();
     await db.execute(
       `INSERT INTO permissions (user_id, type, reason, file_url)
       VALUES (?, ?, ?, ?)`,
@@ -804,8 +899,9 @@ app.post("/api/permissions", async (req, res) => {
   }
 });
 
-app.get("/api/stats", async (req, res) => {
+apiRouter.get("/stats", async (req, res) => {
   try {
+    if (!db) await initDB();
     const [uRows]: any = await db.execute("SELECT COUNT(*) as count FROM users");
     const [aRows]: any = await db.execute(`SELECT COUNT(DISTINCT user_id) as count FROM attendance WHERE ${getDateFilter()}`);
     const [pRows]: any = await db.execute("SELECT COUNT(*) as count FROM permissions WHERE status = 'pending'");
@@ -820,9 +916,10 @@ app.get("/api/stats", async (req, res) => {
   }
 });
 
-app.get("/api/attendance/history/:userId", async (req, res) => {
+apiRouter.get("/attendance/history/:userId", async (req, res) => {
   const { userId } = req.params;
   try {
+    if (!db) await initDB();
     const [rows] = await db.execute(
       `SELECT * FROM attendance WHERE user_id = ? ORDER BY timestamp DESC LIMIT 50`,
       [userId]
@@ -832,6 +929,10 @@ app.get("/api/attendance/history/:userId", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// Mount router on both /api and / to handle Vercel rewrite variations
+app.use("/api", apiRouter);
+app.use("/", apiRouter);
 
 export async function startServer() {
   await initDB();

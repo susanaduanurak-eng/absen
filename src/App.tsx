@@ -771,20 +771,36 @@ export default function App() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setMessage(null);
     try {
       const res = await fetch('/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password })
       });
-      const data = await res.json();
-      if (data.success) {
+
+      let data: any = null;
+      const contentType = res.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        if (!res.ok) {
+          throw new Error(text.slice(0, 150) || `Server status ${res.status}`);
+        }
+      }
+
+      if (data && data.success) {
         setUser(data.user);
       } else {
-        setMessage({ text: data.message, type: 'error' });
+        setMessage({ text: data?.message || "Username atau password salah", type: 'error' });
       }
-    } catch (err) {
-      setMessage({ text: "Gagal terhubung ke server", type: 'error' });
+    } catch (err: any) {
+      console.error("Login request error:", err);
+      setMessage({ 
+        text: err?.message ? `Gagal: ${err.message}` : "Gagal terhubung ke server. Periksa database Neon pada Vercel.", 
+        type: 'error' 
+      });
     } finally {
       setLoading(false);
     }
