@@ -57,10 +57,7 @@ CREATE TABLE `attendance` (
   `address` text DEFAULT NULL,
   `selfie` longtext DEFAULT NULL,
   PRIMARY KEY (`id`),
-  KEY `idx_attendance_user_id` (`user_id`),
-  KEY `idx_attendance_timestamp` (`timestamp`),
-  KEY `idx_attendance_user_time` (`user_id`, `timestamp`),
-  KEY `idx_attendance_user_type_time` (`user_id`, `type`, `timestamp`),
+  KEY `user_id` (`user_id`),
   CONSTRAINT `attendance_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -70,18 +67,15 @@ CREATE TABLE `journals` (
   `user_id` int(11) NOT NULL,
   `class_id` int(11) NOT NULL,
   `subject_id` int(11) NOT NULL,
-  `teaching_hours` text DEFAULT '1',
   `content` text NOT NULL,
   `selfie` longtext DEFAULT NULL,
   `latitude` decimal(10,8) DEFAULT NULL,
   `longitude` decimal(11,8) DEFAULT NULL,
   `timestamp` datetime DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  KEY `idx_journals_user_id` (`user_id`),
-  KEY `idx_journals_class_id` (`class_id`),
-  KEY `idx_journals_subject_id` (`subject_id`),
-  KEY `idx_journals_timestamp` (`timestamp`),
-  KEY `idx_journals_user_timestamp` (`user_id`, `timestamp`),
+  KEY `user_id` (`user_id`),
+  KEY `class_id` (`class_id`),
+  KEY `subject_id` (`subject_id`),
   CONSTRAINT `journals_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
   CONSTRAINT `journals_ibfk_2` FOREIGN KEY (`class_id`) REFERENCES `classes` (`id`),
   CONSTRAINT `journals_ibfk_3` FOREIGN KEY (`subject_id`) REFERENCES `subjects` (`id`)
@@ -97,35 +91,18 @@ CREATE TABLE `permissions` (
   `status` enum('pending','approved','rejected') DEFAULT 'pending',
   `timestamp` datetime DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  KEY `idx_permissions_user_id` (`user_id`),
-  KEY `idx_permissions_timestamp` (`timestamp`),
-  KEY `idx_permissions_status` (`status`),
-  KEY `idx_permissions_user_timestamp` (`user_id`, `timestamp`),
+  KEY `user_id` (`user_id`),
   CONSTRAINT `permissions_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- --------------------------------------------------------
 
 -- Seed Default Data
-INSERT INTO `users` (`username`, `password`, `name`, `role`, `nip`) VALUES
-('admin', 'admin123', 'Administrator', 'admin', '198501012010011001'),
-('guru', 'guru123', 'Guru Contoh', 'guru', '199002022015022002');
-
-INSERT INTO `classes` (`name`) VALUES
-('X RPL 1'),
-('XI RPL 1'),
-('XII RPL 1'),
-('X TKJ 1'),
-('XI TKJ 1');
-
-INSERT INTO `subjects` (`name`) VALUES
-('Pemrograman Web'),
-('Basis Data'),
-('Matematika'),
-('Bahasa Indonesia'),
-('Pendidikan Agama');
+INSERT INTO `users` (`username`, `password`, `name`, `role`) VALUES
+('admin', 'admin123', 'Administrator', 'admin'),
+('guru', 'guru123', 'Guru Contoh', 'guru');
 
 INSERT INTO `geolocations` (`name`, `latitude`, `longitude`, `radius`) VALUES
-('SMKN 1 Poco Ranaka', -8.61800000, 120.61200000, 150);
+('Sekolah', -6.20000000, 106.81660000, 100);
 
 COMMIT;

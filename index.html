@@ -6,7 +6,6 @@
     <title>ABSENSI & JURNAL SMKN 1 POCO RANAKA</title>
     <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#2563eb" />
-    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Absensi SMKN 1" />
@@ -16,6 +15,9 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="preconnect" href="https://unpkg.com">
+    
+    <!-- Preload Critical Assets -->
+    <link rel="preload" href="/src/main.tsx" as="script">
     
     <!-- Non-blocking CSS -->
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" media="print" onload="this.media='all'">
@@ -63,28 +65,9 @@
       <div id="initial-loader">
         <div class="loader-logo"></div>
         <div class="loader-text">SMKN 1 POCO RANAKA</div>
-        <div id="loader-fallback" style="display: none; margin-top: 24px; text-align: center;">
-          <p style="font-size: 12px; color: #94a3b8; margin-bottom: 12px; font-weight: 500;">
-            Memuat aplikasi... Jika terlalu lama, silakan muat ulang.
-          </p>
-          <button 
-            onclick="window.location.reload(true);" 
-            style="background: #2563eb; color: white; border: none; padding: 8px 18px; border-radius: 12px; font-size: 12px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.05em;"
-          >
-            Muat Ulang
-          </button>
-        </div>
       </div>
     </div>
     <script>
-      // Show fallback button if loading takes more than 4 seconds
-      setTimeout(function() {
-        var fallback = document.getElementById('loader-fallback');
-        if (fallback) {
-          fallback.style.display = 'block';
-        }
-      }, 4000);
-
       // Force clear cache if ?reset=true is in URL
       if (window.location.search.includes('reset=true')) {
         if ('serviceWorker' in navigator) {
@@ -99,6 +82,7 @@
             for (let name of names) caches.delete(name);
           });
         }
+        // Remove reset from URL and reload
         window.location.href = window.location.origin + window.location.pathname;
       }
     </script>
